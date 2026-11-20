@@ -87,8 +87,10 @@ a.lk{color:var(--navy2);font-weight:800;text-decoration:none;font-size:14px}
   </div>
 
   <div class="card" id="l-main">
-    <label>اسم المستخدم (رقم الموبايل)</label>
-    <input id="l-ph" inputmode="tel" autocomplete="username" placeholder="01xxxxxxxxx">
+    <label>اسم المستخدم</label>
+    <input id="l-name" autocomplete="name" placeholder="اكتب اسمك المسجل لدى الإدارة">
+    <label>رقم الموبايل</label>
+    <input id="l-ph" inputmode="tel" autocomplete="tel" placeholder="01xxxxxxxxx">
     <label>كلمة المرور</label>
     <input id="l-pw" type="password" autocomplete="current-password" placeholder="••••••">
     <button class="full gb" id="l-go" style="margin-top:14px">تسجيل الدخول</button>
@@ -175,24 +177,42 @@ $('to-signup').onclick = e => { e.preventDefault(); lview('signup'); };
 $('to-forgot').onclick = e => { e.preventDefault(); lview('forgot'); };
 document.querySelectorAll('.back').forEach(a => a.onclick = e => { e.preventDefault(); lview('main'); });
 
-async function doLogin(ph, pw) {
+const cleanName = v => String(v || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ar');
+async function doLogin(ph, pw, enteredName) {
   let hint = 0; try { hint = +localStorage.getItem('hc_ver_' + ph) || 0; } catch (e) {}
   const order = [hint, 0, 1, 2, 3].filter((v, i, a) => a.indexOf(v) === i);
   let last = null;
   for (const v of order) {
-    try { await authM.signInWithEmailAndPassword(auth, FB.emailFor(ph, v), pw); try { localStorage.setItem('hc_ver_' + ph, String(v)); } catch (e) {} return { ok:true }; }
-    catch (e) { last = e; if (e.code === 'auth/too-many-requests' || e.code === 'auth/network-request-failed') break; }
+    try {
+      const cred = await authM.signInWithEmailAndPassword(auth, FB.emailFor(ph, v), pw);
+      try { localStorage.setItem('hc_ver_' + ph, String(v)); } catch (e) {}
+      if (enteredName) {
+        let registeredName = '';
+        const customer = await fsM.getDoc(fsM.doc(fs, 'customers', ph));
+        if (customer.exists()) registeredName = customer.data().name || '';
+        if (!registeredName) {
+          const signup = await fsM.getDoc(fsM.doc(fs, 'signups', cred.user.uid));
+          if (signup.exists()) registeredName = signup.data().name || '';
+        }
+        if (!registeredName || cleanName(registeredName) !== cleanName(enteredName)) {
+          await authM.signOut(auth);
+          return { ok:false, err:'اسم المستخدم غير مطابق للاسم المسجل لدى الإدارة' };
+        }
+      }
+      return { ok:true };
+    } catch (e) { last = e; if (e.code === 'auth/too-many-requests' || e.code === 'auth/network-request-failed') break; }
   }
   const c = last && last.code;
-  return { ok:false, err:(c === 'auth/too-many-requests' || c === 'auth/network-request-failed' || c === 'auth/invalid-api-key') ? errText(last) : 'رقم الموبايل أو كلمة المرور غير صحيحة' };
+  return { ok:false, err:(c === 'auth/too-many-requests' || c === 'auth/network-request-failed' || c === 'auth/invalid-api-key' || c === 'permission-denied') ? errText(last) : 'رقم الموبايل أو كلمة المرور غير صحيحة' };
 }
 $('l-go').onclick = async () => {
-  const ph = FB.normPhone($('l-ph').value), pw = $('l-pw').value, er = $('l-err');
+  const name = $('l-name').value.trim(), ph = FB.normPhone($('l-ph').value), pw = $('l-pw').value, er = $('l-err');
   er.textContent = '';
+  if (name.length < 2) { er.textContent = 'اكتب اسم المستخدم'; return; }
   if (!ph) { er.textContent = 'اكتب رقم الموبايل (11 رقماً يبدأ بـ 01)'; return; }
   if (!pw) { er.textContent = 'اكتب كلمة المرور'; return; }
   const btn = $('l-go'); btn.disabled = true; btn.textContent = 'جارٍ الدخول…';
-  const r = await doLogin(ph, pw);
+  const r = await doLogin(ph, pw, name);
   btn.disabled = false; btn.textContent = 'تسجيل الدخول';
   if (!r.ok) er.textContent = r.err; else setTimeout(() => offerBio(ph, pw), 600);
 };
@@ -359,7 +379,7 @@ function openCart() {
     `<div class="row"><b>الإجمالي</b><b style="font-size:20px">${money(cartTotal())} ج</b></div>
      <label>ملاحظة للطلب (اختياري)</label><textarea id="o-note" rows="2" placeholder="مثال: التسليم بعد العصر"></textarea>
      <div style="display:flex;gap:8px;margin-top:12px"><button class="gb" style="flex:1" id="o-send" ${ids.length ? '' : 'disabled'}>إرسال الطلب</button><button class="ghost" id="o-close">إغلاق</button></div>
-     <p class="mut">يصل طلبك للإدارة فوراً، وسيُضاف على حسابك بعد التجهيز.</p>`;
+     <p class="mut">سيصل إشعار للإدارة بطلبك وتفاصيل الأصناف أو الخدمات المختارة، وسيتم التواصل معك لتأكيد التنفيذ.</p>`;
   c.onclick = e => { const b = e.target.closest('button[data-a]'); if (!b) return; const id = b.dataset.i; const q = (CART[id] ? CART[id].q : 0) + (b.dataset.a === 'p' ? 1 : -1); if (q <= 0) delete CART[id]; else CART[id].q = q; saveCart(); updateCart(); drawShop(); openCart(); };
   $('o-close').onclick = () => s.classList.add('hide');
   s.onclick = e => { if (e.target === s) s.classList.add('hide'); };
@@ -372,7 +392,7 @@ async function sendOrder() {
   const b = $('o-send'); b.disabled = true; b.textContent = 'جارٍ الإرسال…';
   try {
     await fsM.addDoc(fsM.collection(fs, 'orders'), { uid:ME.uid, phone:ME.ph, name:ME.name || ME.ph, items, total, note, status:'new', createdAt:fsM.serverTimestamp() });
-    if (FB.ntfy) { try { fetch('https://ntfy.sh/' + FB.ntfy, { method:'POST', headers:{ Title:'New order', Priority:'high' }, body:(ME.name || ME.ph) + ' - ' + items.length + ' items - ' + total + ' EGP' }); } catch (e) {} }
+    if (FB.ntfy) { try { await fetch('https://ntfy.sh/' + encodeURIComponent(FB.ntfy), { method:'POST', headers:{ Title:'طلب جديد من متجر أحمد تكنولوجي', Priority:'high', Tags:'bell' }, body:(ME.name || ME.ph) + ' (' + ME.ph + ')\n' + items.map(i => i.n + ' × ' + i.q).join('، ') + '\nالإجمالي: ' + total + ' جنيه\n' + (note || '') }); } catch (e) {} }
     CART = {}; saveCart(); updateCart(); $('sheet').classList.add('hide'); drawShop();
     toast('تم إرسال طلبك ✓'); show('t-ord');
   } catch (e) { b.disabled = false; b.textContent = 'إرسال الطلب'; toast('تعذر الإرسال: ' + errText(e)); }

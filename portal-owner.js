@@ -238,8 +238,8 @@ function notifyOrders(fresh){
   var mx = fresh.reduce(function(m,o){ return Math.max(m, tsMs(o)); }, +localStorage.getItem(SEEN_KEY) || 0);
   try{ localStorage.setItem(SEEN_KEY, String(mx)); }catch(e){}
   var o = fresh[0];
-  var title = fresh.length > 1 ? fresh.length + ' طلبات جديدة' : 'طلب جديد من ' + (o.name || 'عميل');
-  var body = fresh.length > 1 ? 'افتح بوابة العملاء لمراجعتها' : (o.items || []).map(function(i){ return i.n + ' × ' + i.q; }).join('، ') + ' — ' + money(o.total) + ' ج';
+  var title = fresh.length > 1 ? fresh.length + ' طلبات جديدة من المتجر/الخدمات' : 'طلب متجر أو خدمة من ' + (o.name || 'عميل');
+  var body = fresh.length > 1 ? 'افتح إدارة العملاء لمراجعة الطلبات' : (o.phone || '') + ' — ' + (o.items || []).map(function(i){ return i.n + ' × ' + i.q; }).join('، ') + ' — ' + money(o.total) + ' ج' + (o.note ? ' — ' + o.note : '');
   say(title); beep();
   try{
     if ('Notification' in window && Notification.permission === 'granted'){
