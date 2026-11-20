@@ -73,6 +73,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:20%;right:20%;heig
 .st.new{background:#fff3d1;color:#7a5a00}.st.prep{background:#dcecff;color:#14518f}.st.done{background:#dff5e7;color:var(--green)}.st.cancel{background:#fdecec;color:var(--red)}
 .toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#14202e;color:#fff;padding:10px 18px;border-radius:12px;z-index:60;font-weight:700;display:none;max-width:90%}
 .hide{display:none!important}
+a.lk{color:var(--navy2);font-weight:800;text-decoration:none;font-size:14px}
 </style>
 </head>
 <body>
@@ -82,15 +83,42 @@ nav button.on::before{content:"";position:absolute;top:0;left:20%;right:20%;heig
   <div style="text-align:center;margin:10px 0 22px">
     <div style="width:84px;height:84px;margin:0 auto 10px;border-radius:22px;background:linear-gradient(135deg,#0A1D33,#1F4E78);display:grid;place-items:center;font-size:42px">🧾</div>
     <h1 style="margin:0;color:var(--navy)">حسابي ومتجري</h1>
-    <div class="mut">ادخل برقم موبايلك وكلمة المرور التي وصلتك</div>
+    <div class="mut" id="l-sub">سجّل دخولك لعرض حسابك ونقاطك والطلب من المتجر</div>
   </div>
-  <div class="card">
-    <label>رقم الموبايل</label>
+
+  <div class="card" id="l-main">
+    <label>اسم المستخدم (رقم الموبايل)</label>
     <input id="l-ph" inputmode="tel" autocomplete="username" placeholder="01xxxxxxxxx">
     <label>كلمة المرور</label>
     <input id="l-pw" type="password" autocomplete="current-password" placeholder="••••••">
-    <button class="full gb" id="l-go" style="margin-top:14px">دخول</button>
+    <button class="full gb" id="l-go" style="margin-top:14px">تسجيل الدخول</button>
+    <button class="full ghost hide" id="l-bio" style="margin-top:8px">🔒 الدخول بالبصمة</button>
     <div id="l-err" class="err"></div>
+    <div style="display:flex;justify-content:space-between;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <a href="#" class="lk" id="to-forgot">نسيت كلمة السر؟</a>
+      <a href="#" class="lk" id="to-signup">إنشاء حساب جديد</a>
+    </div>
+  </div>
+
+  <div class="card hide" id="l-signup">
+    <h2>إنشاء حساب جديد</h2>
+    <label>الاسم</label><input id="s-name" autocomplete="name" placeholder="اسمك كما تعرفه الإدارة">
+    <label>رقم الموبايل (اسم المستخدم)</label><input id="s-ph" inputmode="tel" autocomplete="username" placeholder="01xxxxxxxxx">
+    <label>كلمة المرور (6 أحرف أو أكثر)</label><input id="s-pw" type="password" autocomplete="new-password">
+    <label>تأكيد كلمة المرور</label><input id="s-pw2" type="password" autocomplete="new-password">
+    <button class="full gb" id="s-go" style="margin-top:14px">إنشاء الحساب</button>
+    <div id="s-err" class="err"></div>
+    <p class="mut">بعد التسجيل تقوم الإدارة بتفعيل حسابك وربطه ببياناتك، ثم تراها هنا.</p>
+    <a href="#" class="lk back">← رجوع لتسجيل الدخول</a>
+  </div>
+
+  <div class="card hide" id="l-forgot">
+    <h2>نسيت كلمة السر</h2>
+    <p class="mut">اكتب رقم موبايلك ليصل طلبك للإدارة، وسترسل لك كلمة مرور جديدة على واتساب.</p>
+    <label>رقم الموبايل</label><input id="f-ph" inputmode="tel" placeholder="01xxxxxxxxx">
+    <button class="full gb" id="f-go" style="margin-top:14px">إرسال الطلب</button>
+    <div id="f-err" class="err"></div><div id="f-ok" style="color:var(--green);font-weight:800;margin-top:10px"></div>
+    <a href="#" class="lk back" style="display:block;margin-top:12px">← رجوع لتسجيل الدخول</a>
   </div>
 </div>
 
@@ -140,31 +168,107 @@ let CART = {}; try { CART = JSON.parse(localStorage.getItem('hc_cart') || '{}');
 const saveCart = () => { try { localStorage.setItem('hc_cart', JSON.stringify(CART)); } catch (e) {} };
 
 /* ---------- الدخول ---------- */
+let SIGN = null, DENIED = false;
+const views = { main:'l-main', signup:'l-signup', forgot:'l-forgot' };
+function lview(v) { Object.keys(views).forEach(k => $(views[k]).classList.toggle('hide', k !== v)); }
+$('to-signup').onclick = e => { e.preventDefault(); lview('signup'); };
+$('to-forgot').onclick = e => { e.preventDefault(); lview('forgot'); };
+document.querySelectorAll('.back').forEach(a => a.onclick = e => { e.preventDefault(); lview('main'); });
+
+async function doLogin(ph, pw) {
+  let hint = 0; try { hint = +localStorage.getItem('hc_ver_' + ph) || 0; } catch (e) {}
+  const order = [hint, 0, 1, 2, 3].filter((v, i, a) => a.indexOf(v) === i);
+  let last = null;
+  for (const v of order) {
+    try { await authM.signInWithEmailAndPassword(auth, FB.emailFor(ph, v), pw); try { localStorage.setItem('hc_ver_' + ph, String(v)); } catch (e) {} return { ok:true }; }
+    catch (e) { last = e; if (e.code === 'auth/too-many-requests' || e.code === 'auth/network-request-failed') break; }
+  }
+  const c = last && last.code;
+  return { ok:false, err:(c === 'auth/too-many-requests' || c === 'auth/network-request-failed' || c === 'auth/invalid-api-key') ? errText(last) : 'رقم الموبايل أو كلمة المرور غير صحيحة' };
+}
 $('l-go').onclick = async () => {
   const ph = FB.normPhone($('l-ph').value), pw = $('l-pw').value, er = $('l-err');
   er.textContent = '';
   if (!ph) { er.textContent = 'اكتب رقم الموبايل (11 رقماً يبدأ بـ 01)'; return; }
   if (!pw) { er.textContent = 'اكتب كلمة المرور'; return; }
   const btn = $('l-go'); btn.disabled = true; btn.textContent = 'جارٍ الدخول…';
-  let hint = 0; try { hint = +localStorage.getItem('hc_ver_' + ph) || 0; } catch (e) {}
-  const order = [hint, 0, 1, 2, 3].filter((v, i, a) => a.indexOf(v) === i);
-  let ok = false, last = null;
-  for (const v of order) {
-    try { await authM.signInWithEmailAndPassword(auth, FB.emailFor(ph, v), pw); try { localStorage.setItem('hc_ver_' + ph, String(v)); } catch (e) {} ok = true; break; }
-    catch (e) { last = e; if (e.code === 'auth/too-many-requests' || e.code === 'auth/network-request-failed') break; }
-  }
-  btn.disabled = false; btn.textContent = 'دخول';
-  if (!ok) er.textContent = (last && (last.code === 'auth/too-many-requests' || last.code === 'auth/network-request-failed' || last.code === 'auth/invalid-api-key')) ? errText(last) : 'رقم الموبايل أو كلمة المرور غير صحيحة';
+  const r = await doLogin(ph, pw);
+  btn.disabled = false; btn.textContent = 'تسجيل الدخول';
+  if (!r.ok) er.textContent = r.err; else setTimeout(() => offerBio(ph, pw), 600);
 };
 $('l-pw').onkeydown = e => { if (e.key === 'Enter') $('l-go').click(); };
 
+/* إنشاء حساب */
+$('s-go').onclick = async () => {
+  const name = $('s-name').value.trim(), ph = FB.normPhone($('s-ph').value), pw = $('s-pw').value, pw2 = $('s-pw2').value, er = $('s-err');
+  er.textContent = '';
+  if (name.length < 2) { er.textContent = 'اكتب اسمك'; return; }
+  if (!ph) { er.textContent = 'اكتب رقم موبايل صحيحاً (11 رقماً يبدأ بـ 01)'; return; }
+  if (pw.length < 6) { er.textContent = 'كلمة المرور قصيرة (6 أحرف على الأقل)'; return; }
+  if (pw !== pw2) { er.textContent = 'كلمتا المرور غير متطابقتين'; return; }
+  const btn = $('s-go'); btn.disabled = true; btn.textContent = 'جارٍ الإنشاء…';
+  try {
+    const cr = await authM.createUserWithEmailAndPassword(auth, FB.emailFor(ph, 0), pw);
+    try { localStorage.setItem('hc_ver_' + ph, '0'); } catch (e) {}
+    await fsM.setDoc(fsM.doc(fs, 'signups', cr.user.uid), { uid:cr.user.uid, phone:ph, name, status:'pending', createdAt:fsM.serverTimestamp() });
+    setTimeout(() => offerBio(ph, pw), 800);
+  } catch (e) {
+    er.textContent = e.code === 'auth/email-already-in-use' ? 'هذا الرقم مسجّل من قبل. سجّل دخولك، أو اضغط «نسيت كلمة السر».'
+      : e.code === 'auth/weak-password' ? 'كلمة المرور ضعيفة' : errText(e);
+  }
+  btn.disabled = false; btn.textContent = 'إنشاء الحساب';
+};
+
+/* نسيت كلمة السر: طلب يصل للإدارة، وهي ترسل كلمة جديدة على واتساب الرقم نفسه */
+$('f-go').onclick = async () => {
+  const ph = FB.normPhone($('f-ph').value), er = $('f-err'), ok = $('f-ok'); er.textContent = ''; ok.textContent = '';
+  if (!ph) { er.textContent = 'اكتب رقم موبايل صحيحاً'; return; }
+  const btn = $('f-go'); btn.disabled = true;
+  try { await fsM.setDoc(fsM.doc(fs, 'resets', ph), { phone:ph, at:Date.now() }); ok.textContent = 'تم إرسال طلبك للإدارة ✓ ستصلك كلمة مرور جديدة على واتساب.'; }
+  catch (e) { er.textContent = errText(e); }
+  btn.disabled = false;
+};
+
+/* الدخول بالبصمة (بصمة/قفل الجهاز عبر WebAuthn). تُحفظ بيانات الدخول على هذا الجهاز فقط */
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+async function bioAvail() { try { return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (e) { return false; } }
+function bioGet() { try { return JSON.parse(localStorage.getItem('hc_bio') || 'null'); } catch (e) { return null; } }
+async function bioEnable(ph, pw) {
+  const cred = await navigator.credentials.create({ publicKey:{
+    challenge:rnd(32), rp:{ name:'حسابي ومتجري', id:location.hostname },
+    user:{ id:rnd(16), name:ph, displayName:ph },
+    pubKeyCredParams:[{ type:'public-key', alg:-7 }, { type:'public-key', alg:-257 }],
+    authenticatorSelection:{ authenticatorAttachment:'platform', userVerification:'required', residentKey:'discouraged' },
+    timeout:60000, attestation:'none' } });
+  localStorage.setItem('hc_bio', JSON.stringify({ id:b64(cred.rawId), ph, pw }));
+}
+async function offerBio(ph, pw) {
+  try {
+    if (bioGet() || localStorage.getItem('hc_bio_no') || !(await bioAvail())) return;
+    if (confirm('هل تريد الدخول بالبصمة في المرات القادمة بدل كتابة كلمة المرور؟')) { await bioEnable(ph, pw); toast('تم تفعيل الدخول بالبصمة ✓'); renderMore(); }
+    else localStorage.setItem('hc_bio_no', '1');
+  } catch (e) { toast('تعذر تفعيل البصمة على هذا الجهاز'); }
+}
+$('l-bio').onclick = async () => {
+  const b = bioGet(), er = $('l-err'); if (!b) return; er.textContent = '';
+  try {
+    await navigator.credentials.get({ publicKey:{ challenge:rnd(32), rpId:location.hostname, userVerification:'required', timeout:60000,
+      allowCredentials:[{ type:'public-key', id:unb64(b.id), transports:['internal'] }] } });
+  } catch (e) { er.textContent = 'لم يتم التحقق بالبصمة'; return; }
+  const r = await doLogin(b.ph, b.pw); if (!r.ok) er.textContent = r.err + ' — سجّل الدخول بكلمة المرور.';
+};
+(async () => { if (bioGet() && await bioAvail()) $('l-bio').classList.remove('hide'); })();
+
 authM.onAuthStateChanged(auth, u => {
-  unsubs.forEach(f => { try { f(); } catch (e) {} }); unsubs = []; DATA = null; ORD = [];
+  unsubs.forEach(f => { try { f(); } catch (e) {} }); unsubs = []; DATA = null; ORD = []; SIGN = null; DENIED = false;
   if (!u) { $('v-app').classList.add('hide'); $('v-login').classList.remove('hide'); return; }
   ME.uid = u.uid; ME.ph = (u.email || '').split('@')[0].split('.')[0];
   $('v-login').classList.add('hide'); $('v-app').classList.remove('hide');
   renderAcc(); renderOrd(); renderMore(); updateCart();
-  unsubs.push(fsM.onSnapshot(fsM.doc(fs, 'customers', ME.ph), s => { DATA = s.exists() ? s.data() : false; if (DATA) ME.name = DATA.name; renderAcc(); head(); }, e => { DATA = null; $('t-acc').innerHTML = '<div class="card"><b>تعذر عرض حسابك</b><p class="mut">' + esc(errText(e)) + '. إن تغيّرت كلمة مرورك فسجّل الدخول بالكلمة الجديدة.</p></div>'; }));
+  unsubs.push(fsM.onSnapshot(fsM.doc(fs, 'customers', ME.ph), s => { DENIED = false; DATA = s.exists() ? s.data() : false; if (DATA) ME.name = DATA.name; renderAcc(); head(); }, e => { DATA = null; DENIED = true; renderAcc(); }));
+  unsubs.push(fsM.onSnapshot(fsM.doc(fs, 'signups', u.uid), s => { SIGN = s.exists() ? s.data() : null; if (SIGN && !ME.name) ME.name = SIGN.name; renderAcc(); head(); }, () => {}));
   const q = fsM.query(fsM.collection(fs, 'orders'), fsM.where('uid', '==', u.uid));
   unsubs.push(fsM.onSnapshot(q, s => { ORD = []; s.forEach(d => ORD.push({ id:d.id, ...d.data() })); ORD.sort((a, b) => ms(b) - ms(a)); renderOrd(); }, () => {}));
 });
@@ -174,6 +278,11 @@ function head() { $('h-name').textContent = ME.name ? 'أهلاً ' + ME.name : 
 /* ---------- حسابي ---------- */
 function renderAcc() {
   const t = $('t-acc'); head();
+  if (DATA === null && DENIED) {
+    if (SIGN && SIGN.status === 'rejected') { t.innerHTML = '<div class="card"><b>تعذّر تفعيل حسابك</b><p class="mut">تواصل مع الإدارة لمراجعة طلبك.</p></div>'; return; }
+    if (SIGN) { t.innerHTML = '<div class="big ok" style="background:#fff8e6;border-color:#e6cd8f;color:#7a5a00"><div class="l">حسابك بانتظار التفعيل</div><div class="v" style="font-size:22px">شكراً ' + esc(SIGN.name || '') + '</div></div><div class="card"><p style="margin:0">استلمت الإدارة طلبك، وبعد تفعيله تظهر هنا بيانات حسابك ونقاطك ويمكنك الطلب من المتجر.</p></div>'; return; }
+    t.innerHTML = '<div class="card"><b>تعذر عرض حسابك</b><p class="mut">إن تغيّرت كلمة مرورك فسجّل الدخول بالكلمة الجديدة، أو تواصل مع الإدارة.</p></div>'; return;
+  }
   if (DATA === null) { t.innerHTML = '<div class="card mut">جارٍ التحميل…</div>'; return; }
   if (DATA === false) { t.innerHTML = '<div class="card"><b>لم تُنشر بيانات حسابك بعد</b><p class="mut">تواصل مع الإدارة.</p></div>'; return; }
   const d = DATA, due = +d.due || 0;
@@ -281,12 +390,24 @@ function renderOrd() {
 
 /* ---------- المزيد ---------- */
 function renderMore() {
-  $('t-more').innerHTML = `<div class="card"><h2>تغيير كلمة المرور</h2><label>كلمة المرور الجديدة (6 أحرف أو أكثر)</label><input id="m-pw" type="password" autocomplete="new-password"><button class="full" id="m-save" style="margin-top:10px">حفظ</button><div id="m-msg" class="mut" style="margin-top:8px"></div></div>
+  const hb = bioGet();
+  $('t-more').innerHTML = `<div class="card"><h2>الدخول بالبصمة</h2><p class="mut">${hb ? 'مفعّل على هذا الجهاز.' : 'ادخل بالبصمة بدل كتابة كلمة المرور (على هذا الجهاز فقط).'}</p><button class="${hb ? 'red' : 'ghost'} full" id="m-bio">${hb ? 'إيقاف الدخول بالبصمة' : 'تفعيل الدخول بالبصمة'}</button><div id="m-bmsg" class="mut" style="margin-top:8px"></div></div>
+    <div class="card"><h2>تغيير كلمة المرور</h2><label>كلمة المرور الجديدة (6 أحرف أو أكثر)</label><input id="m-pw" type="password" autocomplete="new-password"><button class="full" id="m-save" style="margin-top:10px">حفظ</button><div id="m-msg" class="mut" style="margin-top:8px"></div></div>
     <button class="red full" id="m-out">تسجيل الخروج</button>`;
   $('m-out').onclick = () => authM.signOut(auth);
+  $('m-bio').onclick = async () => {
+    const m = $('m-bmsg');
+    if (bioGet()) { localStorage.removeItem('hc_bio'); localStorage.setItem('hc_bio_no', '1'); $('l-bio').classList.add('hide'); toast('تم إيقاف الدخول بالبصمة'); renderMore(); return; }
+    if (!(await bioAvail())) { m.textContent = 'هذا الجهاز لا يدعم الدخول بالبصمة من المتصفح'; return; }
+    const pw = prompt('اكتب كلمة المرور الحالية لتفعيل البصمة'); if (!pw) return;
+    try {
+      await authM.reauthenticateWithCredential(auth.currentUser, authM.EmailAuthProvider.credential(auth.currentUser.email, pw));
+      await bioEnable(ME.ph, pw); localStorage.removeItem('hc_bio_no'); $('l-bio').classList.remove('hide'); toast('تم تفعيل الدخول بالبصمة ✓'); renderMore();
+    } catch (e) { m.textContent = e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' ? 'كلمة المرور غير صحيحة' : 'تعذر تفعيل البصمة'; }
+  };
   $('m-save').onclick = async () => {
     const v = $('m-pw').value; if (v.length < 6) { $('m-msg').textContent = 'كلمة المرور قصيرة'; return; }
-    try { await authM.updatePassword(auth.currentUser, v); $('m-msg').textContent = 'تم تغيير كلمة المرور ✓'; $('m-pw').value = ''; }
+    try { await authM.updatePassword(auth.currentUser, v); $('m-msg').textContent = 'تم تغيير كلمة المرور ✓'; $('m-pw').value = ''; const hb2 = bioGet(); if (hb2) { hb2.pw = v; localStorage.setItem('hc_bio', JSON.stringify(hb2)); } }
     catch (e) { $('m-msg').textContent = e.code === 'auth/requires-recent-login' ? 'سجّل الخروج ثم ادخل من جديد ثم أعد المحاولة' : errText(e); }
   };
 }

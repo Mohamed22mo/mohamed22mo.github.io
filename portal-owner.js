@@ -7,7 +7,7 @@ var FB = window.HISAB_FB;
 if (!FB) return;
 
 var S = null;                       // وحدات Firebase بعد التحميل
-var P = { user:null, orders:[], first:true, unsub:null, timer:null, busy:false, msg:'', pubAt:'' };
+var P = { user:null, orders:[], signups:[], resets:[], first:true, f2:true, f3:true, unsub:null, unsub2:null, unsub3:null, timer:null, busy:false, msg:'', pubAt:'' };
 var HASH_KEY = 'hisab_portal_hash', SEEN_KEY = 'hisab_portal_seen';
 var hashes = {}; try{ hashes = JSON.parse(localStorage.getItem(HASH_KEY) || '{}'); }catch(e){}
 function saveHashes(){ try{ localStorage.setItem(HASH_KEY, JSON.stringify(hashes)); }catch(e){} }
@@ -42,8 +42,8 @@ function isOwner(){ return !!(P.user && P.user.email === FB.ownerEmail); }
 function onAuth(u){
   P.user = u || null;
   if (u && u.email !== FB.ownerEmail){ P.msg = 'هذا الحساب ليس حساب صاحب البرنامج'; S.U.signOut(S.auth); return; }
-  if (P.unsub){ try{ P.unsub(); }catch(e){} P.unsub = null; }
-  P.orders = []; P.first = true;
+  [ 'unsub', 'unsub2', 'unsub3' ].forEach(function(k){ if (P[k]){ try{ P[k](); }catch(e){} P[k] = null; } });
+  P.orders = []; P.signups = []; P.resets = []; P.first = true; P.f2 = true; P.f3 = true;
   if (isOwner()) startOrders();
   render();
   if (isOwner()) setTimeout(function(){ publishAll(false); publishCatalog(false); }, 1500);
@@ -184,6 +184,13 @@ async function makeAccount(name, reset){
 }
 function portalUrl(){ return location.origin + '/customer.html'; }
 async function shareCred(name, ph, pw){
+  if (!pw){
+    var m2 = 'أهلاً ' + name + '\nتم تفعيل حسابك ✓\nادخل من الرابط:\n' + portalUrl() + '\nبرقم موبايلك وكلمة المرور التي اخترتها عند التسجيل.\n\nترى كشف حسابك ونقاطك وتطلب منتجاتك.';
+    if (await uiConfirm('حساب ' + name + ' سجّله العميل بنفسه (كلمة مروره لا نعرفها).\nإرسال رابط الدخول له عبر واتساب؟')){
+      openExternal('https://wa.me/' + ((typeof waNumber === 'function') ? waNumber(ph) : ph) + '?text=' + encodeURIComponent(m2));
+    }
+    return;
+  }
   var msg = 'أهلاً ' + name + '\nرابط حسابك ومتجرنا:\n' + portalUrl() + '\n\nرقم الموبايل: ' + ph + '\nكلمة المرور: ' + pw + '\n\nمن خلاله ترى كشف حسابك ونقاطك وتطلب منتجاتك.';
   if (await uiConfirm('بيانات دخول ' + name + ':\nالموبايل: ' + ph + '\nكلمة المرور: ' + pw + '\n\nإرسالها للعميل عبر واتساب؟')){
     var num = (typeof waNumber === 'function') ? waNumber(ph) : ph;
@@ -204,6 +211,28 @@ function startOrders(){
     if (fresh.length) notifyOrders(fresh);
     render(); updateBadge();
   }, function(e){ P.msg = errText(e); render(); });
+  P.unsub2 = S.F.onSnapshot(S.F.collection(S.fs, 'signups'), function(snap){
+    var list = []; snap.forEach(function(d){ var o = d.data(); o.uid = d.id; list.push(o); });
+    var added = []; if (!P.f2) snap.docChanges().forEach(function(ch){ if (ch.type === 'added' && ch.doc.data().status === 'pending') added.push(ch.doc.data()); });
+    P.f2 = false; P.signups = list.sort(function(a,b){ return tsMs(b) - tsMs(a); });
+    if (added.length) alertOwner('طلب تسجيل جديد', added.map(function(x){ return x.name + ' ' + x.phone; }).join('، '));
+    render(); updateBadge();
+  }, function(){});
+  P.unsub3 = S.F.onSnapshot(S.F.collection(S.fs, 'resets'), function(snap){
+    var list = []; snap.forEach(function(d){ var o = d.data(); o.id = d.id; list.push(o); });
+    var added = []; if (!P.f3) snap.docChanges().forEach(function(ch){ if (ch.type === 'added') added.push(ch.doc.data()); });
+    P.f3 = false; P.resets = list.sort(function(a,b){ return (b.at || 0) - (a.at || 0); });
+    if (added.length) alertOwner('طلب كلمة مرور جديدة', added.map(function(x){ return x.phone; }).join('، '));
+    render(); updateBadge();
+  }, function(){});
+}
+function alertOwner(title, body){
+  say(title); beep();
+  try{
+    if ('Notification' in window && Notification.permission === 'granted' && navigator.serviceWorker && navigator.serviceWorker.getRegistration){
+      navigator.serviceWorker.getRegistration().then(function(r){ if (r && r.showNotification) r.showNotification(title, { body:body, icon:'icon-192.png', badge:'icon-192.png', tag:'hisab-req', renotify:true, dir:'rtl', lang:'ar', vibrate:[200,100,200] }); });
+    }
+  }catch(e){}
 }
 function notifyOrders(fresh){
   var mx = fresh.reduce(function(m,o){ return Math.max(m, tsMs(o)); }, +localStorage.getItem(SEEN_KEY) || 0);
@@ -231,7 +260,7 @@ function beep(){
   }catch(e){}
 }
 function updateBadge(){
-  var n = P.orders.filter(function(o){ return o.status === 'new'; }).length;
+  var n = P.orders.filter(function(o){ return o.status === 'new'; }).length + P.signups.filter(function(x){ return x.status === 'pending'; }).length + P.resets.length;
   var b = el('pt-badge'); if (b){ b.textContent = n ? String(n) : ''; b.style.display = n ? 'inline-block' : 'none'; }
 }
 async function enableNotif(){
@@ -259,6 +288,61 @@ async function bookOrder(id){
   say('تم تسجيل الطلب كعمليات');
 }
 
+/* ---------- طلبات التسجيل وكلمات المرور ---------- */
+function byPhone(ph){ return db.customers.filter(function(c){ return FB.normPhone(phoneOf(c)) === ph; })[0]; }
+async function approveSignup(uid){
+  var sg = P.signups.filter(function(x){ return x.uid === uid; })[0]; if (!sg) return;
+  var ph = sg.phone, c = byPhone(ph);
+  if (!c){
+    if (!(await uiConfirm('لا يوجد عميل برقم ' + ph + ' في البرنامج.\nهل تضيفه كعميل جديد باسم «' + sg.name + '»؟'))) return;
+    var nm = db.customers.some(function(x){ return x.name === sg.name; }) ? sg.name + ' (' + ph + ')' : sg.name;
+    c = { name:nm, phone:ph, prev:0, verified:null, excluded:false }; db.customers.push(c); save();
+  } else if (!(await uiConfirm('تفعيل حساب «' + c.name + '» برقم ' + ph + '؟\nالاسم الذي كتبه العميل: ' + sg.name + '\nتأكد أن الرقم رقمه فعلاً قبل التفعيل، لأنه سيرى كشف الحساب.'))) return;
+  try{
+    var d = custData(c); d.phone = ph; d.uid = uid; d.upd = new Date().toISOString();
+    await S.F.setDoc(S.F.doc(S.fs, 'customers', ph), d);
+    portalDb().accounts[ph] = { uid:uid, pw:'', ver:0, self:true, at:today(), name:c.name };
+    hashes['c:' + ph] = JSON.stringify(Object.assign({}, d, { upd:undefined })); saveHashes(); save();
+    await S.F.updateDoc(S.F.doc(S.fs, 'signups', uid), { status:'approved' });
+    render(); say('تم تفعيل الحساب');
+    shareCred(c.name, ph, '');
+  }catch(e){ uiAlert('تعذر التفعيل: ' + errText(e)); }
+}
+async function rejectSignup(uid){
+  if (!(await uiConfirm('رفض هذا الطلب؟'))) return;
+  try{ await S.F.updateDoc(S.F.doc(S.fs, 'signups', uid), { status:'rejected' }); }catch(e){ uiAlert(errText(e)); }
+}
+async function handleReset(ph){
+  var c = byPhone(ph);
+  if (!c){
+    if (await uiConfirm('لا يوجد عميل برقم ' + ph + ' في البرنامج. حذف الطلب؟')) try{ await S.F.deleteDoc(S.F.doc(S.fs, 'resets', ph)); }catch(e){}
+    return;
+  }
+  var before = (portalDb().accounts[ph] || {}).uid;
+  await makeAccount(c.name, true);
+  if ((portalDb().accounts[ph] || {}).uid !== before){ try{ await S.F.deleteDoc(S.F.doc(S.fs, 'resets', ph)); }catch(e){} }
+}
+async function dropReset(ph){ try{ await S.F.deleteDoc(S.F.doc(S.fs, 'resets', ph)); }catch(e){ uiAlert(errText(e)); } }
+function renderReq(){
+  var box = el('pt-req-box'); if (!box) return;
+  var sg = P.signups.filter(function(x){ return x.status === 'pending'; }), rs = P.resets;
+  if (!sg.length && !rs.length){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<h3>طلبات تحتاج إجراءً <span class="owe">(' + (sg.length + rs.length) + ')</span></h3>' +
+    sg.map(function(x){
+      var known = byPhone(x.phone);
+      return '<div class="box" style="background:#fff8e6;margin-top:8px"><b>تسجيل جديد: ' + h(x.name) + '</b><div class="muted" style="direction:ltr;text-align:right">' + h(x.phone) + '</div>' +
+        '<div class="muted">' + (known ? 'عميل مسجّل: ' + h(known.name) : '<span class="owe">لا يوجد عميل بهذا الرقم</span>') + '</div>' +
+        '<div style="margin-top:6px"><button onclick="portalApprove(\'' + x.uid + '\')">تفعيل</button> <button class="del" onclick="portalReject(\'' + x.uid + '\')">رفض</button></div></div>';
+    }).join('') +
+    rs.map(function(x){
+      var known = byPhone(x.phone);
+      return '<div class="box" style="background:#eef5ff;margin-top:8px"><b>نسيت كلمة السر</b><div class="muted" style="direction:ltr;text-align:right">' + h(x.phone) + '</div>' +
+        '<div class="muted">' + (known ? 'العميل: ' + h(known.name) : '<span class="owe">لا يوجد عميل بهذا الرقم</span>') + '</div>' +
+        '<div style="margin-top:6px"><button onclick="portalReset(\'' + x.phone + '\')">إنشاء كلمة مرور جديدة وإرسالها</button> <button class="del" onclick="portalDropReset(\'' + x.phone + '\')">تجاهل</button></div></div>';
+    }).join('');
+}
+
 /* ---------- الواجهة ---------- */
 var STL = { 'new':'جديد', 'prep':'قيد التجهيز', 'done':'تم التسليم', 'cancel':'ملغي' };
 function render(){
@@ -276,6 +360,7 @@ function render(){
     '<p class="muted">رابط العملاء: <b style="direction:ltr;display:inline-block">' + h(portalUrl()) + '</b> <button onclick="portalCopyLink()">نسخ</button></p>' +
     (P.msg ? '<p class="owe">' + h(P.msg) + '</p>' : '');
   m.style.display = 'block';
+  renderReq();
   var perm = ('Notification' in window) ? Notification.permission : 'unsupported';
   var ob = el('pt-orders-box');
   if (ob){
@@ -323,6 +408,7 @@ window.portalLogin = login; window.portalLogout = logout; window.portalNotif = e
 window.portalPublishAll = function(m){ return publishAll(m !== false); };
 window.portalPublishCatalog = function(m){ return publishCatalog(m !== false); };
 window.portalMake = function(n, r){ return makeAccount(n, r); };
+window.portalApprove = approveSignup; window.portalReject = rejectSignup; window.portalReset = handleReset; window.portalDropReset = dropReset;
 window.portalStatus = setStatus; window.portalBook = bookOrder; window.portalRender = renderCusts;
 window.portalCopyLink = function(){ try{ navigator.clipboard.writeText(portalUrl()); say('تم نسخ الرابط'); }catch(e){ uiAlert(portalUrl()); } };
 window.portalOpen = function(){ sdk().then(render).catch(function(e){ P.msg = errText(e); render(); }); };
