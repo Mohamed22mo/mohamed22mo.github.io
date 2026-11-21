@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0F2740">
-<title>حسابي ومتجري</title>
+<meta name="theme-color" content="#0A1220">
+<title>AHMED TECHNOLOGY — حسابي ومتجري</title>
 <link rel="manifest" href="customer.webmanifest">
 <link rel="icon" href="icon-192.png">
 <style>
@@ -74,54 +74,83 @@ nav button.on::before{content:"";position:absolute;top:0;left:20%;right:20%;heig
 .toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#14202e;color:#fff;padding:10px 18px;border-radius:12px;z-index:60;font-weight:700;display:none;max-width:90%}
 .hide{display:none!important}
 a.lk{color:var(--navy2);font-weight:800;text-decoration:none;font-size:14px}
+
+body.dk{background:#0a1220}
+.lg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px}
+.lcard{width:100%;max-width:440px;background:#111d2f;border:1px solid #1e2f47;border-radius:28px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.lhead{background:linear-gradient(180deg,#12355a,#0e2b4a);text-align:center;padding:26px 18px 22px;color:#fff}
+.llogo{width:80px;height:80px;border-radius:20px;border:2px solid #3b5272;background:#000;display:block;margin:0 auto}
+.lhead h1{font-size:20px;margin:14px 0 8px;letter-spacing:.5px;color:#fff}
+.lhead p{margin:0;color:#b9c8da;font-size:14px;line-height:1.7}
+.lbody{padding:18px}
+.ltabs{display:flex;background:#0b1626;border-radius:18px;padding:6px;gap:4px;margin-bottom:16px}
+.ltabs button{flex:1;background:transparent;color:#9fb0c5;border-radius:14px;padding:13px 4px;font-size:14px;font-weight:800}
+.ltabs button.on{background:#18283f;color:#2eb5ff}
+.linfo{border:1px solid #1d4a6b;background:#0e2236;color:#cfe3f5;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.9;margin-bottom:6px}
+.linfo b{color:#fff}
+.lg label{color:#e2ebf5;font-size:14px;font-weight:800;margin:16px 0 8px}
+.fld{position:relative}
+.fld span{position:absolute;right:15px;top:50%;transform:translateY(-50%);opacity:.65;font-size:18px;pointer-events:none}
+.lg input{background:#0a1220;border:1.5px solid #20324b;color:#fff;border-radius:16px;padding:16px 48px 16px 14px;font-size:16px;text-align:right}
+.lg input::placeholder{color:#5f7188}
+.lg input:focus{outline:none;border-color:#0a86d6}
+.lbtn{width:100%;margin-top:18px;background:#0a86d6;color:#fff;border-radius:16px;padding:16px;font-size:17px;font-weight:800}
+.lbtn.lalt{background:#17263c;color:#cfe3f5;margin-top:10px}
+.lerr{color:#ff8a8a;font-weight:700;margin-top:10px;font-size:14px;min-height:6px}
+.lok{color:#53d98a;font-weight:800;margin-top:10px;font-size:14px}
+.lfoot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px;color:#8ea0b6;font-size:14px}
+.lfoot a{color:#2eb5ff;font-weight:800;text-decoration:none}
 </style>
 </head>
-<body>
+<body class="dk">
 <div class="toast" id="toast"></div>
 
-<div id="v-login" class="login hide">
-  <div style="text-align:center;margin:10px 0 22px">
-    <div style="width:84px;height:84px;margin:0 auto 10px;border-radius:22px;background:linear-gradient(135deg,#0A1D33,#1F4E78);display:grid;place-items:center;font-size:42px">🧾</div>
-    <h1 style="margin:0;color:var(--navy)">حسابي ومتجري</h1>
-    <div class="mut" id="l-sub">سجّل دخولك لعرض حسابك ونقاطك والطلب من المتجر</div>
+<div id="v-login" class="lg hide">
+ <div class="lcard">
+  <div class="lhead">
+    <img class="llogo" src="icon-192.png" alt="">
+    <h1>AHMED TECHNOLOGY CO</h1>
+    <p>بوابة حسابات العملاء (النقاط وكشف الحساب) ودخول الإدارة بالبصمة</p>
   </div>
+  <div class="lbody">
+    <div class="ltabs">
+      <button id="tb-cust" class="on">دخول عميل</button>
+      <button id="tb-signup">إنشاء حساب</button>
+      <button id="tb-admin">دخول الإدارة</button>
+    </div>
 
-  <div class="card" id="l-main">
-    <label>اسم المستخدم</label>
-    <input id="l-name" autocomplete="name" placeholder="اكتب اسمك المسجل لدى الإدارة">
-    <label>رقم الموبايل</label>
-    <input id="l-ph" inputmode="tel" autocomplete="tel" placeholder="01xxxxxxxxx">
-    <label>كلمة المرور</label>
-    <input id="l-pw" type="password" autocomplete="current-password" placeholder="••••••">
-    <button class="full gb" id="l-go" style="margin-top:14px">تسجيل الدخول</button>
-    <button class="full ghost hide" id="l-bio" style="margin-top:8px">🔒 الدخول بالبصمة</button>
-    <div id="l-err" class="err"></div>
-    <div style="display:flex;justify-content:space-between;gap:8px;margin-top:14px;flex-wrap:wrap">
-      <a href="#" class="lk" id="to-forgot">نسيت كلمة السر؟</a>
-      <a href="#" class="lk" id="to-signup">إنشاء حساب جديد</a>
+    <div id="l-main">
+      <div class="linfo">سجّل الدخول لعرض <b>نقاط الكاش باك</b> و<b>كشف حسابك</b> وعملياتك الخاصة فقط، والطلب من المتجر.</div>
+      <label>رقم الهاتف (اسم المستخدم)</label>
+      <div class="fld"><span>📞</span><input id="l-ph" inputmode="tel" autocomplete="username" placeholder="010…"></div>
+      <label>كلمة المرور</label>
+      <div class="fld"><span>🔑</span><input id="l-pw" type="password" autocomplete="current-password" placeholder="••••••"></div>
+      <button class="lbtn" id="l-go">تسجيل الدخول ⇦</button>
+      <button class="lbtn lalt hide" id="l-bio">🔒 الدخول بالبصمة</button>
+      <div id="l-err" class="lerr"></div>
+      <div class="lfoot"><a href="#" id="to-forgot">نسيت كلمة السر؟</a><span>ليس لديك حساب؟ <a href="#" id="to-signup">إنشاء حساب جديد</a></span></div>
+    </div>
+
+    <div id="l-signup" class="hide">
+      <div class="linfo">سجّل بياناتك، وبعد أن تفعّل الإدارة حسابك تظهر لك بياناتك ونقاطك.</div>
+      <label>الاسم</label><div class="fld"><span>👤</span><input id="s-name" autocomplete="name" placeholder="اسمك كما تعرفه الإدارة"></div>
+      <label>رقم الهاتف (اسم المستخدم)</label><div class="fld"><span>📞</span><input id="s-ph" inputmode="tel" autocomplete="username" placeholder="010…"></div>
+      <label>كلمة المرور (6 أحرف أو أكثر)</label><div class="fld"><span>🔑</span><input id="s-pw" type="password" autocomplete="new-password"></div>
+      <label>تأكيد كلمة المرور</label><div class="fld"><span>🔑</span><input id="s-pw2" type="password" autocomplete="new-password"></div>
+      <button class="lbtn" id="s-go">إنشاء الحساب</button>
+      <div id="s-err" class="lerr"></div>
+      <div class="lfoot"><span>لديك حساب؟ <a href="#" class="back">تسجيل الدخول</a></span></div>
+    </div>
+
+    <div id="l-forgot" class="hide">
+      <div class="linfo">اكتب رقم هاتفك ليصل طلبك للإدارة، وسترسل لك كلمة مرور جديدة على واتساب.</div>
+      <label>رقم الهاتف</label><div class="fld"><span>📞</span><input id="f-ph" inputmode="tel" placeholder="010…"></div>
+      <button class="lbtn" id="f-go">إرسال الطلب</button>
+      <div id="f-err" class="lerr"></div><div id="f-ok" class="lok"></div>
+      <div class="lfoot"><span><a href="#" class="back">← رجوع لتسجيل الدخول</a></span></div>
     </div>
   </div>
-
-  <div class="card hide" id="l-signup">
-    <h2>إنشاء حساب جديد</h2>
-    <label>الاسم</label><input id="s-name" autocomplete="name" placeholder="اسمك كما تعرفه الإدارة">
-    <label>رقم الموبايل (اسم المستخدم)</label><input id="s-ph" inputmode="tel" autocomplete="username" placeholder="01xxxxxxxxx">
-    <label>كلمة المرور (6 أحرف أو أكثر)</label><input id="s-pw" type="password" autocomplete="new-password">
-    <label>تأكيد كلمة المرور</label><input id="s-pw2" type="password" autocomplete="new-password">
-    <button class="full gb" id="s-go" style="margin-top:14px">إنشاء الحساب</button>
-    <div id="s-err" class="err"></div>
-    <p class="mut">بعد التسجيل تقوم الإدارة بتفعيل حسابك وربطه ببياناتك، ثم تراها هنا.</p>
-    <a href="#" class="lk back">← رجوع لتسجيل الدخول</a>
-  </div>
-
-  <div class="card hide" id="l-forgot">
-    <h2>نسيت كلمة السر</h2>
-    <p class="mut">اكتب رقم موبايلك ليصل طلبك للإدارة، وسترسل لك كلمة مرور جديدة على واتساب.</p>
-    <label>رقم الموبايل</label><input id="f-ph" inputmode="tel" placeholder="01xxxxxxxxx">
-    <button class="full gb" id="f-go" style="margin-top:14px">إرسال الطلب</button>
-    <div id="f-err" class="err"></div><div id="f-ok" style="color:var(--green);font-weight:800;margin-top:10px"></div>
-    <a href="#" class="lk back" style="display:block;margin-top:12px">← رجوع لتسجيل الدخول</a>
-  </div>
+ </div>
 </div>
 
 <div id="v-app" class="hide">
@@ -165,54 +194,40 @@ const errText = e => {
   return (e && (e.message || c)) || 'حدث خطأ';
 };
 
-let ME = { ph:'', uid:'', name:'' }, DATA = null, CAT = [], CATAT = 0, ORD = [], unsubs = [], orderSnapshotReady = false;
+let ME = { ph:'', uid:'', name:'' }, DATA = null, CAT = [], CATAT = 0, ORD = [], unsubs = [];
 let CART = {}; try { CART = JSON.parse(localStorage.getItem('hc_cart') || '{}'); } catch (e) {}
 const saveCart = () => { try { localStorage.setItem('hc_cart', JSON.stringify(CART)); } catch (e) {} };
 
 /* ---------- الدخول ---------- */
 let SIGN = null, DENIED = false;
 const views = { main:'l-main', signup:'l-signup', forgot:'l-forgot' };
-function lview(v) { Object.keys(views).forEach(k => $(views[k]).classList.toggle('hide', k !== v)); }
+function lview(v) { Object.keys(views).forEach(k => $(views[k]).classList.toggle('hide', k !== v)); $('tb-cust').classList.toggle('on', v !== 'signup'); $('tb-signup').classList.toggle('on', v === 'signup'); }
+$('tb-cust').onclick = () => lview('main');
+$('tb-signup').onclick = () => lview('signup');
+$('tb-admin').onclick = () => { location.href = '/'; };
+if (location.hash === '#signup') lview('signup');
 $('to-signup').onclick = e => { e.preventDefault(); lview('signup'); };
 $('to-forgot').onclick = e => { e.preventDefault(); lview('forgot'); };
 document.querySelectorAll('.back').forEach(a => a.onclick = e => { e.preventDefault(); lview('main'); });
 
-const cleanName = v => String(v || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ar');
-async function doLogin(ph, pw, enteredName) {
+async function doLogin(ph, pw) {
   let hint = 0; try { hint = +localStorage.getItem('hc_ver_' + ph) || 0; } catch (e) {}
   const order = [hint, 0, 1, 2, 3].filter((v, i, a) => a.indexOf(v) === i);
   let last = null;
   for (const v of order) {
-    try {
-      const cred = await authM.signInWithEmailAndPassword(auth, FB.emailFor(ph, v), pw);
-      try { localStorage.setItem('hc_ver_' + ph, String(v)); } catch (e) {}
-      if (enteredName) {
-        let registeredName = '';
-        const customer = await fsM.getDoc(fsM.doc(fs, 'customers', ph));
-        if (customer.exists()) registeredName = customer.data().name || '';
-        if (!registeredName) {
-          const signup = await fsM.getDoc(fsM.doc(fs, 'signups', cred.user.uid));
-          if (signup.exists()) registeredName = signup.data().name || '';
-        }
-        if (!registeredName || cleanName(registeredName) !== cleanName(enteredName)) {
-          await authM.signOut(auth);
-          return { ok:false, err:'اسم المستخدم غير مطابق للاسم المسجل لدى الإدارة' };
-        }
-      }
-      return { ok:true };
-    } catch (e) { last = e; if (e.code === 'auth/too-many-requests' || e.code === 'auth/network-request-failed') break; }
+    try { await authM.signInWithEmailAndPassword(auth, FB.emailFor(ph, v), pw); try { localStorage.setItem('hc_ver_' + ph, String(v)); } catch (e) {} return { ok:true }; }
+    catch (e) { last = e; if (e.code === 'auth/too-many-requests' || e.code === 'auth/network-request-failed') break; }
   }
   const c = last && last.code;
-  return { ok:false, err:(c === 'auth/too-many-requests' || c === 'auth/network-request-failed' || c === 'auth/invalid-api-key' || c === 'permission-denied') ? errText(last) : 'رقم الموبايل أو كلمة المرور غير صحيحة' };
+  return { ok:false, err:(c === 'auth/too-many-requests' || c === 'auth/network-request-failed' || c === 'auth/invalid-api-key') ? errText(last) : 'رقم الموبايل أو كلمة المرور غير صحيحة' };
 }
 $('l-go').onclick = async () => {
-  const name = $('l-name').value.trim(), ph = FB.normPhone($('l-ph').value), pw = $('l-pw').value, er = $('l-err');
+  const ph = FB.normPhone($('l-ph').value), pw = $('l-pw').value, er = $('l-err');
   er.textContent = '';
-  if (name.length < 2) { er.textContent = 'اكتب اسم المستخدم'; return; }
   if (!ph) { er.textContent = 'اكتب رقم الموبايل (11 رقماً يبدأ بـ 01)'; return; }
   if (!pw) { er.textContent = 'اكتب كلمة المرور'; return; }
   const btn = $('l-go'); btn.disabled = true; btn.textContent = 'جارٍ الدخول…';
-  const r = await doLogin(ph, pw, name);
+  const r = await doLogin(ph, pw);
   btn.disabled = false; btn.textContent = 'تسجيل الدخول';
   if (!r.ok) er.textContent = r.err; else setTimeout(() => offerBio(ph, pw), 600);
 };
@@ -282,7 +297,8 @@ $('l-bio').onclick = async () => {
 (async () => { if (bioGet() && await bioAvail()) $('l-bio').classList.remove('hide'); })();
 
 authM.onAuthStateChanged(auth, u => {
-  unsubs.forEach(f => { try { f(); } catch (e) {} }); unsubs = []; DATA = null; ORD = []; SIGN = null; DENIED = false; orderSnapshotReady = false;
+  unsubs.forEach(f => { try { f(); } catch (e) {} }); unsubs = []; DATA = null; ORD = []; SIGN = null; DENIED = false;
+  document.body.classList.toggle('dk', !u);
   if (!u) { $('v-app').classList.add('hide'); $('v-login').classList.remove('hide'); return; }
   ME.uid = u.uid; ME.ph = (u.email || '').split('@')[0].split('.')[0];
   $('v-login').classList.add('hide'); $('v-app').classList.remove('hide');
@@ -290,12 +306,7 @@ authM.onAuthStateChanged(auth, u => {
   unsubs.push(fsM.onSnapshot(fsM.doc(fs, 'customers', ME.ph), s => { DENIED = false; DATA = s.exists() ? s.data() : false; if (DATA) ME.name = DATA.name; renderAcc(); head(); }, e => { DATA = null; DENIED = true; renderAcc(); }));
   unsubs.push(fsM.onSnapshot(fsM.doc(fs, 'signups', u.uid), s => { SIGN = s.exists() ? s.data() : null; if (SIGN && !ME.name) ME.name = SIGN.name; renderAcc(); head(); }, () => {}));
   const q = fsM.query(fsM.collection(fs, 'orders'), fsM.where('uid', '==', u.uid));
-  unsubs.push(fsM.onSnapshot(q, s => {
-    const changes = orderSnapshotReady ? s.docChanges().filter(ch => ch.type === 'modified') : [];
-    ORD = []; s.forEach(d => ORD.push({ id:d.id, ...d.data() })); ORD.sort((a, b) => ms(b) - ms(a)); renderOrd();
-    changes.forEach(ch => notifyOrderStatus(ch.doc.id, ch.doc.data()));
-    orderSnapshotReady = true;
-  }, () => {}));
+  unsubs.push(fsM.onSnapshot(q, s => { ORD = []; s.forEach(d => ORD.push({ id:d.id, ...d.data() })); ORD.sort((a, b) => ms(b) - ms(a)); renderOrd(); }, () => {}));
 });
 const ms = o => { const t = o.createdAt; return t && t.toMillis ? t.toMillis() : (t && t.seconds ? t.seconds * 1000 : Date.now()); };
 function head() { $('h-name').textContent = ME.name ? 'أهلاً ' + ME.name : 'مرحباً'; $('h-sub').textContent = ME.ph; }
@@ -384,7 +395,7 @@ function openCart() {
     `<div class="row"><b>الإجمالي</b><b style="font-size:20px">${money(cartTotal())} ج</b></div>
      <label>ملاحظة للطلب (اختياري)</label><textarea id="o-note" rows="2" placeholder="مثال: التسليم بعد العصر"></textarea>
      <div style="display:flex;gap:8px;margin-top:12px"><button class="gb" style="flex:1" id="o-send" ${ids.length ? '' : 'disabled'}>إرسال الطلب</button><button class="ghost" id="o-close">إغلاق</button></div>
-     <p class="mut">سيصل إشعار للإدارة بطلبك وتفاصيل الأصناف أو الخدمات المختارة، وسيتم التواصل معك لتأكيد التنفيذ.</p>`;
+     <p class="mut">يصل طلبك للإدارة فوراً، وسيُضاف على حسابك بعد التجهيز.</p>`;
   c.onclick = e => { const b = e.target.closest('button[data-a]'); if (!b) return; const id = b.dataset.i; const q = (CART[id] ? CART[id].q : 0) + (b.dataset.a === 'p' ? 1 : -1); if (q <= 0) delete CART[id]; else CART[id].q = q; saveCart(); updateCart(); drawShop(); openCart(); };
   $('o-close').onclick = () => s.classList.add('hide');
   s.onclick = e => { if (e.target === s) s.classList.add('hide'); };
@@ -397,7 +408,7 @@ async function sendOrder() {
   const b = $('o-send'); b.disabled = true; b.textContent = 'جارٍ الإرسال…';
   try {
     await fsM.addDoc(fsM.collection(fs, 'orders'), { uid:ME.uid, phone:ME.ph, name:ME.name || ME.ph, items, total, note, status:'new', createdAt:fsM.serverTimestamp() });
-    if (FB.ntfy) { try { await fetch('https://ntfy.sh/' + encodeURIComponent(FB.ntfy), { method:'POST', headers:{ Title:'طلب جديد من متجر أحمد تكنولوجي', Priority:'high', Tags:'bell' }, body:(ME.name || ME.ph) + ' (' + ME.ph + ')\n' + items.map(i => i.n + ' × ' + i.q).join('، ') + '\nالإجمالي: ' + total + ' جنيه\n' + (note || '') }); } catch (e) {} }
+    if (FB.ntfy) { try { fetch('https://ntfy.sh/' + FB.ntfy, { method:'POST', headers:{ Title:'New order', Priority:'high' }, body:(ME.name || ME.ph) + ' - ' + items.length + ' items - ' + total + ' EGP' }); } catch (e) {} }
     CART = {}; saveCart(); updateCart(); $('sheet').classList.add('hide'); drawShop();
     toast('تم إرسال طلبك ✓'); show('t-ord');
   } catch (e) { b.disabled = false; b.textContent = 'إرسال الطلب'; toast('تعذر الإرسال: ' + errText(e)); }
@@ -405,19 +416,6 @@ async function sendOrder() {
 
 /* ---------- طلباتي ---------- */
 const STL = { new:'جديد', prep:'قيد التجهيز', done:'تم التسليم', cancel:'ملغي' };
-function notifyOrderStatus(id, order) {
-  const labels = { prep:'بدأ تجهيز طلبك', done:'تم تنفيذ طلبك وتسليمه', cancel:'تم إلغاء طلبك' };
-  const title = labels[order.status]; if (!title) return;
-  toast(title + ' ✓');
-  try {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const body = (order.items || []).map(i => i.n + ' × ' + i.q).join('، ') || 'يمكنك فتح طلباتي لمراجعة التفاصيل.';
-    const opt = { body, icon:'icon-192.png', badge:'icon-192.png', tag:'hisab-customer-order-' + id, renotify:true, dir:'rtl', lang:'ar', vibrate:[180,90,180], data:{ url:'customer.html' } };
-    if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
-      navigator.serviceWorker.getRegistration().then(r => { if (r && r.showNotification) r.showNotification(title, opt); else new Notification(title, opt); });
-    } else new Notification(title, opt);
-  } catch (e) {}
-}
 function renderOrd() {
   const t = $('t-ord');
   t.innerHTML = ORD.length ? ORD.map(o => `<div class="card"><div class="row" style="border:0;padding:0 0 6px"><b>${esc(new Date(ms(o)).toLocaleString('ar-EG'))}</b><span class="st ${esc(o.status)}">${STL[o.status] || esc(o.status)}</span></div>
@@ -429,19 +427,10 @@ function renderOrd() {
 /* ---------- المزيد ---------- */
 function renderMore() {
   const hb = bioGet();
-  $('t-more').innerHTML = `<div class="card"><h2>إشعارات الطلبات</h2><p class="mut">فعّل الإشعارات ليصلك تحديث حالة طلبك عندما يكون التطبيق مفتوحًا أو يعمل في الخلفية.</p><button class="ghost full" id="m-notif">${('Notification' in window && Notification.permission === 'granted') ? 'الإشعارات مفعّلة ✓' : '🔔 تفعيل إشعارات الطلبات'}</button><div id="m-nmsg" class="mut" style="margin-top:8px"></div></div><div class="card"><h2>الدخول بالبصمة</h2><p class="mut">${hb ? 'مفعّل على هذا الجهاز.' : 'ادخل بالبصمة بدل كتابة كلمة المرور (على هذا الجهاز فقط).'}</p><button class="${hb ? 'red' : 'ghost'} full" id="m-bio">${hb ? 'إيقاف الدخول بالبصمة' : 'تفعيل الدخول بالبصمة'}</button><div id="m-bmsg" class="mut" style="margin-top:8px"></div></div>
+  $('t-more').innerHTML = `<div class="card"><h2>الدخول بالبصمة</h2><p class="mut">${hb ? 'مفعّل على هذا الجهاز.' : 'ادخل بالبصمة بدل كتابة كلمة المرور (على هذا الجهاز فقط).'}</p><button class="${hb ? 'red' : 'ghost'} full" id="m-bio">${hb ? 'إيقاف الدخول بالبصمة' : 'تفعيل الدخول بالبصمة'}</button><div id="m-bmsg" class="mut" style="margin-top:8px"></div></div>
     <div class="card"><h2>تغيير كلمة المرور</h2><label>كلمة المرور الجديدة (6 أحرف أو أكثر)</label><input id="m-pw" type="password" autocomplete="new-password"><button class="full" id="m-save" style="margin-top:10px">حفظ</button><div id="m-msg" class="mut" style="margin-top:8px"></div></div>
     <button class="red full" id="m-out">تسجيل الخروج</button>`;
   $('m-out').onclick = () => authM.signOut(auth);
-  $('m-notif').onclick = async () => {
-    const msg = $('m-nmsg');
-    if (!('Notification' in window)) { msg.textContent = 'هذا المتصفح لا يدعم الإشعارات.'; return; }
-    try {
-      const perm = await Notification.requestPermission();
-      msg.textContent = perm === 'granted' ? 'تم تفعيل إشعارات الطلبات ✓' : 'لم يتم السماح بالإشعارات. يمكنك تفعيلها من إعدادات المتصفح.';
-      renderMore();
-    } catch (e) { msg.textContent = 'تعذر تفعيل الإشعارات.'; }
-  };
   $('m-bio').onclick = async () => {
     const m = $('m-bmsg');
     if (bioGet()) { localStorage.removeItem('hc_bio'); localStorage.setItem('hc_bio_no', '1'); $('l-bio').classList.add('hide'); toast('تم إيقاف الدخول بالبصمة'); renderMore(); return; }

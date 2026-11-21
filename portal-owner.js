@@ -73,13 +73,12 @@ function custData(c){
            pts:{ avail:k.available, value:k.value, paid:k.paid, year:k.year } };
 }
 async function publishAll(manual){
-  if (!isOwner()) return;
-  if (P.busy){ if (manual) say('جارٍ تنفيذ عملية نشر أخرى؛ انتظر لحظات ثم أعد المحاولة'); return; }
+  if (!isOwner() || P.busy) return;
   var acc = portalDb().accounts, keys = Object.keys(acc);
   if (!keys.length){ if (manual) say('لا توجد حسابات عملاء بعد'); return; }
   P.busy = true;
   try{
-    var batch = S.F.writeBatch(S.fs), n = 0, newHash = {}, targets = [];
+    var batch = S.F.writeBatch(S.fs), n = 0, newHash = {};
     db.customers.forEach(function(c){
       var ph = FB.normPhone(phoneOf(c)); var rec = ph && acc[ph];
       if (!rec || c.excluded || !rec.uid) return;
@@ -88,31 +87,12 @@ async function publishAll(manual){
       if (hashes['c:' + ph] === hs && !manual) return;
       d.upd = new Date().toISOString();
       batch.set(S.F.doc(S.fs, 'customers', ph), d);
-      newHash['c:' + ph] = hs; targets.push({phone:ph, name:c.name, uid:rec.uid, data:d}); n++;
+      newHash['c:' + ph] = hs; n++;
     });
-    if (n){
-      await batch.commit();
-      Object.keys(newHash).forEach(function(k){ hashes[k] = newHash[k]; }); saveHashes();
-    }
+    if (n){ await batch.commit(); Object.keys(newHash).forEach(function(k){ hashes[k] = newHash[k]; }); saveHashes(); }
     P.pubAt = new Date().toLocaleTimeString('ar-EG');
-    if (manual){
-      if (!targets.length){ say('لم يتم العثور على عميل له حساب مفعّل ورقم مطابق؛ راجع ربط الرقم بالحساب'); }
-      else {
-        var checks = await Promise.all(targets.map(async function(x){
-          var snap = await S.F.getDoc(S.F.doc(S.fs, 'customers', x.phone));
-          if (!snap.exists()) return {ok:false, x:x, reason:'السجل غير موجود بعد النشر'};
-          var got = snap.data();
-          var ok = got.uid === x.uid && got.phone === x.phone && Math.abs((+got.due||0)-(+x.data.due||0)) < 0.01 && Math.abs((+got.owed||0)-(+x.data.owed||0)) < 0.01;
-          return {ok:ok, x:x, got:got, reason:ok?'':'بيانات السجل المقروء لا تطابق البيانات المرسلة'};
-        }));
-        var good = checks.filter(function(x){ return x.ok; }).length;
-        var first = checks[0], d = first.x.data;
-        var detail = 'العميل: ' + first.x.name + ' — ' + first.x.phone + '\nالمطلوب: ' + money(d.due) + ' ج — الرصيد: ' + money(d.credit) + ' ج\nالعمليات: ' + (d.rows||[]).length + ' — النقاط: ' + (d.pts ? d.pts.avail : 0);
-        say('تم النشر والتحقق: ' + good + ' من ' + checks.length + ' حساب');
-        if (good !== checks.length || checks.length === 1) uiAlert((good === checks.length ? 'تمت قراءة البيانات من Firebase بنجاح ✓' : 'تنبيه: فشل التحقق من سجل Firebase') + '\n' + detail + (good === checks.length ? '' : '\n' + checks.filter(function(x){return !x.ok;}).map(function(x){return x.reason + ' — ' + x.x.phone;}).join('\n')));
-      }
-    }
-  }catch(e){ P.msg = errText(e); if (manual) uiAlert('تعذر النشر أو التحقق: ' + errText(e)); }
+    if (manual) say(n ? 'تم نشر بيانات ' + n + ' عميل' : 'البيانات منشورة ولا يوجد جديد');
+  }catch(e){ P.msg = errText(e); if (manual) uiAlert('تعذر النشر: ' + errText(e)); }
   P.busy = false; render();
 }
 
@@ -258,8 +238,8 @@ function notifyOrders(fresh){
   var mx = fresh.reduce(function(m,o){ return Math.max(m, tsMs(o)); }, +localStorage.getItem(SEEN_KEY) || 0);
   try{ localStorage.setItem(SEEN_KEY, String(mx)); }catch(e){}
   var o = fresh[0];
-  var title = fresh.length > 1 ? fresh.length + ' طلبات جديدة من المتجر/الخدمات' : 'طلب متجر أو خدمة من ' + (o.name || 'عميل');
-  var body = fresh.length > 1 ? 'افتح إدارة العملاء لمراجعة الطلبات' : (o.phone || '') + ' — ' + (o.items || []).map(function(i){ return i.n + ' × ' + i.q; }).join('، ') + ' — ' + money(o.total) + ' ج' + (o.note ? ' — ' + o.note : '');
+  var title = fresh.length > 1 ? fresh.length + ' طلبات جديدة' : 'طلب جديد من ' + (o.name || 'عميل');
+  var body = fresh.length > 1 ? 'افتح بوابة العملاء لمراجعتها' : (o.items || []).map(function(i){ return i.n + ' × ' + i.q; }).join('، ') + ' — ' + money(o.total) + ' ج';
   say(title); beep();
   try{
     if ('Notification' in window && Notification.permission === 'granted'){
@@ -289,7 +269,7 @@ async function enableNotif(){
   render();
 }
 async function setStatus(id, st){
-  try{ await S.F.updateDoc(S.F.doc(S.fs, 'orders', id), { status:st, statusUpdatedAt:S.F.serverTimestamp() }); }catch(e){ uiAlert('تعذر التحديث: ' + errText(e)); }
+  try{ await S.F.updateDoc(S.F.doc(S.fs, 'orders', id), { status:st }); }catch(e){ uiAlert('تعذر التحديث: ' + errText(e)); }
 }
 async function bookOrder(id){
   var o = P.orders.filter(function(x){ return x.id === id; })[0]; if (!o) return;
@@ -386,7 +366,7 @@ function render(){
   if (ob){
     var n = P.orders.filter(function(o){ return o.status === 'new'; }).length;
     ob.innerHTML = '<h3>طلبات العملاء ' + (n ? '<span class="owe">(' + n + ' جديد)</span>' : '') + '</h3>' +
-      (perm === 'granted' ? '<p class="muted">الإشعارات مفعّلة. تصلك الطلبات الجديدة عندما يكون البرنامج مفتوحًا أو يعمل في الخلفية. أما وصولها بعد إغلاقه تمامًا فيحتاج إعداد إشعارات دفع Firebase على الخادم.</p>'
+      (perm === 'granted' ? '<p class="muted">الإشعارات مفعّلة. تصلك فور وصول طلب والبرنامج مفتوح (حتى لو في الخلفية). ولا تصل والبرنامج مغلق تماماً، لكنك تجد الطلبات الفائتة عند فتحه.</p>'
         : (perm === 'unsupported' ? '' : '<button onclick="portalNotif()">🔔 تفعيل الإشعارات</button>')) +
       (P.orders.length ? P.orders.slice(0, 40).map(orderCard).join('') : '<p class="muted">لا توجد طلبات بعد.</p>');
   }
