@@ -165,7 +165,7 @@ const errText = e => {
   return (e && (e.message || c)) || 'حدث خطأ';
 };
 
-let ME = { ph:'', uid:'', name:'' }, DATA = null, CAT = [], CATAT = 0, ORD = [], unsubs = [];
+let ME = { ph:'', uid:'', name:'' }, DATA = null, CAT = [], CATAT = 0, ORD = [], unsubs = [], orderSnapshotReady = false;
 let CART = {}; try { CART = JSON.parse(localStorage.getItem('hc_cart') || '{}'); } catch (e) {}
 const saveCart = () => { try { localStorage.setItem('hc_cart', JSON.stringify(CART)); } catch (e) {} };
 
@@ -282,7 +282,7 @@ $('l-bio').onclick = async () => {
 (async () => { if (bioGet() && await bioAvail()) $('l-bio').classList.remove('hide'); })();
 
 authM.onAuthStateChanged(auth, u => {
-  unsubs.forEach(f => { try { f(); } catch (e) {} }); unsubs = []; DATA = null; ORD = []; SIGN = null; DENIED = false;
+  unsubs.forEach(f => { try { f(); } catch (e) {} }); unsubs = []; DATA = null; ORD = []; SIGN = null; DENIED = false; orderSnapshotReady = false;
   if (!u) { $('v-app').classList.add('hide'); $('v-login').classList.remove('hide'); return; }
   ME.uid = u.uid; ME.ph = (u.email || '').split('@')[0].split('.')[0];
   $('v-login').classList.add('hide'); $('v-app').classList.remove('hide');
@@ -290,7 +290,12 @@ authM.onAuthStateChanged(auth, u => {
   unsubs.push(fsM.onSnapshot(fsM.doc(fs, 'customers', ME.ph), s => { DENIED = false; DATA = s.exists() ? s.data() : false; if (DATA) ME.name = DATA.name; renderAcc(); head(); }, e => { DATA = null; DENIED = true; renderAcc(); }));
   unsubs.push(fsM.onSnapshot(fsM.doc(fs, 'signups', u.uid), s => { SIGN = s.exists() ? s.data() : null; if (SIGN && !ME.name) ME.name = SIGN.name; renderAcc(); head(); }, () => {}));
   const q = fsM.query(fsM.collection(fs, 'orders'), fsM.where('uid', '==', u.uid));
-  unsubs.push(fsM.onSnapshot(q, s => { ORD = []; s.forEach(d => ORD.push({ id:d.id, ...d.data() })); ORD.sort((a, b) => ms(b) - ms(a)); renderOrd(); }, () => {}));
+  unsubs.push(fsM.onSnapshot(q, s => {
+    const changes = orderSnapshotReady ? s.docChanges().filter(ch => ch.type === 'modified') : [];
+    ORD = []; s.forEach(d => ORD.push({ id:d.id, ...d.data() })); ORD.sort((a, b) => ms(b) - ms(a)); renderOrd();
+    changes.forEach(ch => notifyOrderStatus(ch.doc.id, ch.doc.data()));
+    orderSnapshotReady = true;
+  }, () => {}));
 });
 const ms = o => { const t = o.createdAt; return t && t.toMillis ? t.toMillis() : (t && t.seconds ? t.seconds * 1000 : Date.now()); };
 function head() { $('h-name').textContent = ME.name ? 'أهلاً ' + ME.name : 'مرحباً'; $('h-sub').textContent = ME.ph; }
@@ -400,6 +405,19 @@ async function sendOrder() {
 
 /* ---------- طلباتي ---------- */
 const STL = { new:'جديد', prep:'قيد التجهيز', done:'تم التسليم', cancel:'ملغي' };
+function notifyOrderStatus(id, order) {
+  const labels = { prep:'بدأ تجهيز طلبك', done:'تم تنفيذ طلبك وتسليمه', cancel:'تم إلغاء طلبك' };
+  const title = labels[order.status]; if (!title) return;
+  toast(title + ' ✓');
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const body = (order.items || []).map(i => i.n + ' × ' + i.q).join('، ') || 'يمكنك فتح طلباتي لمراجعة التفاصيل.';
+    const opt = { body, icon:'icon-192.png', badge:'icon-192.png', tag:'hisab-customer-order-' + id, renotify:true, dir:'rtl', lang:'ar', vibrate:[180,90,180], data:{ url:'customer.html' } };
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+      navigator.serviceWorker.getRegistration().then(r => { if (r && r.showNotification) r.showNotification(title, opt); else new Notification(title, opt); });
+    } else new Notification(title, opt);
+  } catch (e) {}
+}
 function renderOrd() {
   const t = $('t-ord');
   t.innerHTML = ORD.length ? ORD.map(o => `<div class="card"><div class="row" style="border:0;padding:0 0 6px"><b>${esc(new Date(ms(o)).toLocaleString('ar-EG'))}</b><span class="st ${esc(o.status)}">${STL[o.status] || esc(o.status)}</span></div>
@@ -411,10 +429,19 @@ function renderOrd() {
 /* ---------- المزيد ---------- */
 function renderMore() {
   const hb = bioGet();
-  $('t-more').innerHTML = `<div class="card"><h2>الدخول بالبصمة</h2><p class="mut">${hb ? 'مفعّل على هذا الجهاز.' : 'ادخل بالبصمة بدل كتابة كلمة المرور (على هذا الجهاز فقط).'}</p><button class="${hb ? 'red' : 'ghost'} full" id="m-bio">${hb ? 'إيقاف الدخول بالبصمة' : 'تفعيل الدخول بالبصمة'}</button><div id="m-bmsg" class="mut" style="margin-top:8px"></div></div>
+  $('t-more').innerHTML = `<div class="card"><h2>إشعارات الطلبات</h2><p class="mut">فعّل الإشعارات ليصلك تحديث حالة طلبك عندما يكون التطبيق مفتوحًا أو يعمل في الخلفية.</p><button class="ghost full" id="m-notif">${('Notification' in window && Notification.permission === 'granted') ? 'الإشعارات مفعّلة ✓' : '🔔 تفعيل إشعارات الطلبات'}</button><div id="m-nmsg" class="mut" style="margin-top:8px"></div></div><div class="card"><h2>الدخول بالبصمة</h2><p class="mut">${hb ? 'مفعّل على هذا الجهاز.' : 'ادخل بالبصمة بدل كتابة كلمة المرور (على هذا الجهاز فقط).'}</p><button class="${hb ? 'red' : 'ghost'} full" id="m-bio">${hb ? 'إيقاف الدخول بالبصمة' : 'تفعيل الدخول بالبصمة'}</button><div id="m-bmsg" class="mut" style="margin-top:8px"></div></div>
     <div class="card"><h2>تغيير كلمة المرور</h2><label>كلمة المرور الجديدة (6 أحرف أو أكثر)</label><input id="m-pw" type="password" autocomplete="new-password"><button class="full" id="m-save" style="margin-top:10px">حفظ</button><div id="m-msg" class="mut" style="margin-top:8px"></div></div>
     <button class="red full" id="m-out">تسجيل الخروج</button>`;
   $('m-out').onclick = () => authM.signOut(auth);
+  $('m-notif').onclick = async () => {
+    const msg = $('m-nmsg');
+    if (!('Notification' in window)) { msg.textContent = 'هذا المتصفح لا يدعم الإشعارات.'; return; }
+    try {
+      const perm = await Notification.requestPermission();
+      msg.textContent = perm === 'granted' ? 'تم تفعيل إشعارات الطلبات ✓' : 'لم يتم السماح بالإشعارات. يمكنك تفعيلها من إعدادات المتصفح.';
+      renderMore();
+    } catch (e) { msg.textContent = 'تعذر تفعيل الإشعارات.'; }
+  };
   $('m-bio').onclick = async () => {
     const m = $('m-bmsg');
     if (bioGet()) { localStorage.removeItem('hc_bio'); localStorage.setItem('hc_bio_no', '1'); $('l-bio').classList.add('hide'); toast('تم إيقاف الدخول بالبصمة'); renderMore(); return; }

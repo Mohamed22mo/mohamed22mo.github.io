@@ -269,7 +269,7 @@ async function enableNotif(){
   render();
 }
 async function setStatus(id, st){
-  try{ await S.F.updateDoc(S.F.doc(S.fs, 'orders', id), { status:st }); }catch(e){ uiAlert('تعذر التحديث: ' + errText(e)); }
+  try{ await S.F.updateDoc(S.F.doc(S.fs, 'orders', id), { status:st, statusUpdatedAt:S.F.serverTimestamp() }); }catch(e){ uiAlert('تعذر التحديث: ' + errText(e)); }
 }
 async function bookOrder(id){
   var o = P.orders.filter(function(x){ return x.id === id; })[0]; if (!o) return;
@@ -366,7 +366,7 @@ function render(){
   if (ob){
     var n = P.orders.filter(function(o){ return o.status === 'new'; }).length;
     ob.innerHTML = '<h3>طلبات العملاء ' + (n ? '<span class="owe">(' + n + ' جديد)</span>' : '') + '</h3>' +
-      (perm === 'granted' ? '<p class="muted">الإشعارات مفعّلة. تصلك فور وصول طلب والبرنامج مفتوح (حتى لو في الخلفية). ولا تصل والبرنامج مغلق تماماً، لكنك تجد الطلبات الفائتة عند فتحه.</p>'
+      (perm === 'granted' ? '<p class="muted">الإشعارات مفعّلة. تصلك الطلبات الجديدة عندما يكون البرنامج مفتوحًا أو يعمل في الخلفية. أما وصولها بعد إغلاقه تمامًا فيحتاج إعداد إشعارات دفع Firebase على الخادم.</p>'
         : (perm === 'unsupported' ? '' : '<button onclick="portalNotif()">🔔 تفعيل الإشعارات</button>')) +
       (P.orders.length ? P.orders.slice(0, 40).map(orderCard).join('') : '<p class="muted">لا توجد طلبات بعد.</p>');
   }
