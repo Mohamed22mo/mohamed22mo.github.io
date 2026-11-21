@@ -1,4 +1,4 @@
-const V='hisab-v12';
+const V='hisab-v13';
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(V).then(c=>c.addAll(['./','./index.html','./customer.html','./customer.webmanifest','./fb-config.js','./portal-owner.js','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-512-maskable.png']).catch(()=>{})))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
 // network first, cache fallback. API calls (sync) are never intercepted or cached.
