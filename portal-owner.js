@@ -82,6 +82,7 @@ async function publishAll(manual){
     db.customers.forEach(function(c){
       var ph = FB.normPhone(phoneOf(c)); var rec = ph && acc[ph];
       if (!rec || c.excluded || !rec.uid) return;
+      if (rec.name && rec.name !== c.name && db.customers.some(function(x){ return x.name === rec.name && FB.normPhone(phoneOf(x)) === ph; })) return;
       var d = custData(c); d.phone = ph; d.uid = rec.uid;
       var hs = JSON.stringify(d);
       if (hashes['c:' + ph] === hs && !manual) return;
@@ -343,6 +344,27 @@ function renderReq(){
     }).join('');
 }
 
+async function checkCust(name){
+  var c = accountFor(name); if (!c) return uiAlert('العميل غير موجود');
+  var ph = FB.normPhone(phoneOf(c)), rec = ph && portalDb().accounts[ph];
+  var d = custData(c);
+  var dups = db.customers.filter(function(x){ return FB.normPhone(phoneOf(x)) === ph; }).map(function(x){ return x.name; });
+  var t = 'العميل: ' + name + '\nالموبايل: ' + (ph || 'غير صحيح') + '\nحساب البوابة: ' + (rec ? 'موجود' : 'غير موجود') +
+    (dups.length > 1 ? '\n⚠ عملاء بنفس الرقم: ' + dups.join('، ') : '') +
+    '\n\nفي برنامجك الآن:\nإجمالي الحساب ' + d.owed + ' | المدفوع ' + d.credit + ' | المطلوب ' + d.due + '\nعمليات مفتوحة: ' + d.rows.length + ' | نقاط الكاش باك: ' + d.pts.avail;
+  if (ph){
+    try{
+      var sn = await S.F.getDoc(S.F.doc(S.fs, 'customers', ph));
+      if (sn.exists()){
+        var p = sn.data();
+        t += '\n\nالمنشور للعميل:\nالمطلوب ' + p.due + ' | عمليات: ' + (p.rows || []).length + ' | نقاط: ' + (p.pts ? p.pts.avail : 0) + '\nآخر نشر: ' + (p.upd || '—') +
+             '\nمرتبط بحساب العميل: ' + (rec && p.uid === rec.uid ? 'نعم' : 'لا (الحساب مختلف)');
+      } else t += '\n\nلا توجد بيانات منشورة لهذا الرقم.';
+    }catch(e){ t += '\n\nتعذر قراءة المنشور: ' + errText(e); }
+  }
+  uiAlert(t);
+}
+
 /* ---------- الواجهة ---------- */
 var STL = { 'new':'جديد', 'prep':'قيد التجهيز', 'done':'تم التسليم', 'cancel':'ملغي' };
 function render(){
@@ -397,7 +419,7 @@ function renderCusts(){
     '<table><tr><th>العميل</th><th>الموبايل</th><th>الحساب</th></tr>' + list.map(function(c){
       var ph = FB.normPhone(phoneOf(c)), rec = ph && acc[ph], nm = JSON.stringify(c.name).replace(/"/g, '&quot;');
       var act = !ph ? '<span class="owe">رقم غير صحيح</span>' : (rec
-        ? '<button onclick="portalMake(' + nm + ',false)">إرسال البيانات</button> <button class="del" onclick="portalMake(' + nm + ',true)">كلمة مرور جديدة</button>'
+        ? '<button onclick="portalCheck(' + nm + ')">فحص</button> <button onclick="portalMake(' + nm + ',false)">إرسال البيانات</button> <button class="del" onclick="portalMake(' + nm + ',true)">كلمة مرور جديدة</button>'
         : '<button onclick="portalMake(' + nm + ',false)">إنشاء حساب</button>');
       return '<tr><td class="r">' + h(c.name) + '</td><td style="direction:ltr">' + h(ph || phoneOf(c) || '—') + '</td><td>' + act + '</td></tr>';
     }).join('') + '</table>';
@@ -409,6 +431,7 @@ window.portalPublishAll = function(m){ return publishAll(m !== false); };
 window.portalPublishCatalog = function(m){ return publishCatalog(m !== false); };
 window.portalMake = function(n, r){ return makeAccount(n, r); };
 window.portalApprove = approveSignup; window.portalReject = rejectSignup; window.portalReset = handleReset; window.portalDropReset = dropReset;
+window.portalCheck = checkCust;
 window.portalStatus = setStatus; window.portalBook = bookOrder; window.portalRender = renderCusts;
 window.portalCopyLink = function(){ try{ navigator.clipboard.writeText(portalUrl()); say('تم نسخ الرابط'); }catch(e){ uiAlert(portalUrl()); } };
 window.portalOpen = function(){ sdk().then(render).catch(function(e){ P.msg = errText(e); render(); }); };
