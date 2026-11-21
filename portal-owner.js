@@ -73,12 +73,13 @@ function custData(c){
            pts:{ avail:k.available, value:k.value, paid:k.paid, year:k.year } };
 }
 async function publishAll(manual){
-  if (!isOwner() || P.busy) return;
+  if (!isOwner()) return;
+  if (P.busy){ if (manual) say('جارٍ تنفيذ عملية نشر أخرى؛ انتظر لحظات ثم أعد المحاولة'); return; }
   var acc = portalDb().accounts, keys = Object.keys(acc);
   if (!keys.length){ if (manual) say('لا توجد حسابات عملاء بعد'); return; }
   P.busy = true;
   try{
-    var batch = S.F.writeBatch(S.fs), n = 0, newHash = {};
+    var batch = S.F.writeBatch(S.fs), n = 0, newHash = {}, targets = [];
     db.customers.forEach(function(c){
       var ph = FB.normPhone(phoneOf(c)); var rec = ph && acc[ph];
       if (!rec || c.excluded || !rec.uid) return;
@@ -87,12 +88,31 @@ async function publishAll(manual){
       if (hashes['c:' + ph] === hs && !manual) return;
       d.upd = new Date().toISOString();
       batch.set(S.F.doc(S.fs, 'customers', ph), d);
-      newHash['c:' + ph] = hs; n++;
+      newHash['c:' + ph] = hs; targets.push({phone:ph, name:c.name, uid:rec.uid, data:d}); n++;
     });
-    if (n){ await batch.commit(); Object.keys(newHash).forEach(function(k){ hashes[k] = newHash[k]; }); saveHashes(); }
+    if (n){
+      await batch.commit();
+      Object.keys(newHash).forEach(function(k){ hashes[k] = newHash[k]; }); saveHashes();
+    }
     P.pubAt = new Date().toLocaleTimeString('ar-EG');
-    if (manual) say(n ? 'تم نشر بيانات ' + n + ' عميل' : 'البيانات منشورة ولا يوجد جديد');
-  }catch(e){ P.msg = errText(e); if (manual) uiAlert('تعذر النشر: ' + errText(e)); }
+    if (manual){
+      if (!targets.length){ say('لم يتم العثور على عميل له حساب مفعّل ورقم مطابق؛ راجع ربط الرقم بالحساب'); }
+      else {
+        var checks = await Promise.all(targets.map(async function(x){
+          var snap = await S.F.getDoc(S.F.doc(S.fs, 'customers', x.phone));
+          if (!snap.exists()) return {ok:false, x:x, reason:'السجل غير موجود بعد النشر'};
+          var got = snap.data();
+          var ok = got.uid === x.uid && got.phone === x.phone && Math.abs((+got.due||0)-(+x.data.due||0)) < 0.01 && Math.abs((+got.owed||0)-(+x.data.owed||0)) < 0.01;
+          return {ok:ok, x:x, got:got, reason:ok?'':'بيانات السجل المقروء لا تطابق البيانات المرسلة'};
+        }));
+        var good = checks.filter(function(x){ return x.ok; }).length;
+        var first = checks[0], d = first.x.data;
+        var detail = 'العميل: ' + first.x.name + ' — ' + first.x.phone + '\nالمطلوب: ' + money(d.due) + ' ج — الرصيد: ' + money(d.credit) + ' ج\nالعمليات: ' + (d.rows||[]).length + ' — النقاط: ' + (d.pts ? d.pts.avail : 0);
+        say('تم النشر والتحقق: ' + good + ' من ' + checks.length + ' حساب');
+        if (good !== checks.length || checks.length === 1) uiAlert((good === checks.length ? 'تمت قراءة البيانات من Firebase بنجاح ✓' : 'تنبيه: فشل التحقق من سجل Firebase') + '\n' + detail + (good === checks.length ? '' : '\n' + checks.filter(function(x){return !x.ok;}).map(function(x){return x.reason + ' — ' + x.x.phone;}).join('\n')));
+      }
+    }
+  }catch(e){ P.msg = errText(e); if (manual) uiAlert('تعذر النشر أو التحقق: ' + errText(e)); }
   P.busy = false; render();
 }
 
