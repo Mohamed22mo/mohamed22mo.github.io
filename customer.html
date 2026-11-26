@@ -100,6 +100,11 @@ body.dk{background:#0a1220}
 .lok{color:#53d98a;font-weight:800;margin-top:10px;font-size:14px}
 .lfoot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px;color:#8ea0b6;font-size:14px}
 .lfoot a{color:#2eb5ff;font-weight:800;text-decoration:none}
+
+.bgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(max-width:520px){.bgrid{grid-template-columns:repeat(2,1fr)}}
+.bb{background:#f4f8fc;color:var(--navy2);border:1px solid var(--line);border-radius:14px;padding:12px 4px;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bb .e{font-size:26px}
 </style>
 </head>
 <body class="dk">
@@ -143,9 +148,11 @@ body.dk{background:#0a1220}
     </div>
 
     <div id="l-forgot" class="hide">
-      <div class="linfo">اكتب رقم هاتفك ليصل طلبك للإدارة، وسترسل لك كلمة مرور جديدة على واتساب.</div>
+      <div class="linfo">اكتب رقم هاتفك وكلمة المرور الجديدة التي تريدها. تصل الإدارة طلبك وتتأكد منك، وبعد موافقتها تعمل كلمة المرور الجديدة. الإدارة لا ترى كلمة مرورك.</div>
       <label>رقم الهاتف</label><div class="fld"><span>📞</span><input id="f-ph" inputmode="tel" placeholder="010…"></div>
-      <button class="lbtn" id="f-go">إرسال الطلب</button>
+      <label>كلمة المرور الجديدة (6 أحرف أو أكثر)</label><div class="fld"><span>🔑</span><input id="f-pw" type="password" autocomplete="new-password"></div>
+      <label>تأكيد كلمة المرور</label><div class="fld"><span>🔑</span><input id="f-pw2" type="password" autocomplete="new-password"></div>
+      <button class="lbtn" id="f-go">إرسال طلب إعادة التعيين</button>
       <div id="f-err" class="lerr"></div><div id="f-ok" class="lok"></div>
       <div class="lfoot"><span><a href="#" class="back">← رجوع لتسجيل الدخول</a></span></div>
     </div>
@@ -194,7 +201,7 @@ const errText = e => {
   return (e && (e.message || c)) || 'حدث خطأ';
 };
 
-let ME = { ph:'', uid:'', name:'' }, DATA = null, CAT = [], CATAT = 0, ORD = [], unsubs = [];
+let ME = { ph:'', uid:'', name:'' }, DATA = null, CAT = [], CATAT = 0, ORD = [], unsubs = [], SETT = {};
 let CART = {}; try { CART = JSON.parse(localStorage.getItem('hc_cart') || '{}'); } catch (e) {}
 const saveCart = () => { try { localStorage.setItem('hc_cart', JSON.stringify(CART)); } catch (e) {} };
 
@@ -245,7 +252,7 @@ $('s-go').onclick = async () => {
   try {
     const cr = await authM.createUserWithEmailAndPassword(auth, FB.emailFor(ph, 0), pw);
     try { localStorage.setItem('hc_ver_' + ph, '0'); } catch (e) {}
-    await fsM.setDoc(fsM.doc(fs, 'signups', cr.user.uid), { uid:cr.user.uid, phone:ph, name, status:'pending', createdAt:fsM.serverTimestamp() });
+    await fsM.setDoc(fsM.doc(fs, 'signups', cr.user.uid), { uid:cr.user.uid, phone:ph, name, kind:'signup', status:'pending', createdAt:fsM.serverTimestamp() });
     setTimeout(() => offerBio(ph, pw), 800);
   } catch (e) {
     er.textContent = e.code === 'auth/email-already-in-use' ? 'هذا الرقم مسجّل من قبل. سجّل دخولك، أو اضغط «نسيت كلمة السر».'
@@ -254,14 +261,24 @@ $('s-go').onclick = async () => {
   btn.disabled = false; btn.textContent = 'إنشاء الحساب';
 };
 
-/* نسيت كلمة السر: طلب يصل للإدارة، وهي ترسل كلمة جديدة على واتساب الرقم نفسه */
+/* نسيت كلمة السر: يختار العميل كلمة مرور جديدة بنفسه، وتوافق الإدارة على الطلب دون أن ترى الكلمة */
 $('f-go').onclick = async () => {
-  const ph = FB.normPhone($('f-ph').value), er = $('f-err'), ok = $('f-ok'); er.textContent = ''; ok.textContent = '';
+  const ph = FB.normPhone($('f-ph').value), pw = $('f-pw').value, pw2 = $('f-pw2').value, er = $('f-err'), ok = $('f-ok'); er.textContent = ''; ok.textContent = '';
   if (!ph) { er.textContent = 'اكتب رقم موبايل صحيحاً'; return; }
-  const btn = $('f-go'); btn.disabled = true;
-  try { await fsM.setDoc(fsM.doc(fs, 'resets', ph), { phone:ph, at:Date.now() }); ok.textContent = 'تم إرسال طلبك للإدارة ✓ ستصلك كلمة مرور جديدة على واتساب.'; }
-  catch (e) { er.textContent = errText(e); }
-  btn.disabled = false;
+  if (pw.length < 6) { er.textContent = 'كلمة المرور قصيرة (6 أحرف على الأقل)'; return; }
+  if (pw !== pw2) { er.textContent = 'كلمتا المرور غير متطابقتين'; return; }
+  const btn = $('f-go'); btn.disabled = true; btn.textContent = 'جارٍ الإرسال…';
+  let done = false, last = null;
+  for (let v = 1; v <= 8 && !done; v++) {
+    try {
+      const cr = await authM.createUserWithEmailAndPassword(auth, FB.emailFor(ph, v), pw);
+      try { localStorage.setItem('hc_ver_' + ph, String(v)); } catch (e) {}
+      await fsM.setDoc(fsM.doc(fs, 'signups', cr.user.uid), { uid:cr.user.uid, phone:ph, name:'', kind:'reset', status:'pending', createdAt:fsM.serverTimestamp() });
+      done = true;
+    } catch (e) { last = e; if (e.code !== 'auth/email-already-in-use') break; }
+  }
+  btn.disabled = false; btn.textContent = 'إرسال طلب إعادة التعيين';
+  if (!done) er.textContent = last && last.code === 'auth/email-already-in-use' ? 'تعذر إنشاء الطلب، تواصل مع الإدارة' : errText(last);
 };
 
 /* الدخول بالبصمة (بصمة/قفل الجهاز عبر WebAuthn). تُحفظ بيانات الدخول على هذا الجهاز فقط */
@@ -316,7 +333,7 @@ function renderAcc() {
   const t = $('t-acc'); head();
   if (DATA === null && DENIED) {
     if (SIGN && SIGN.status === 'rejected') { t.innerHTML = '<div class="card"><b>تعذّر تفعيل حسابك</b><p class="mut">تواصل مع الإدارة لمراجعة طلبك.</p></div>'; return; }
-    if (SIGN) { t.innerHTML = '<div class="big ok" style="background:#fff8e6;border-color:#e6cd8f;color:#7a5a00"><div class="l">حسابك بانتظار التفعيل</div><div class="v" style="font-size:22px">شكراً ' + esc(SIGN.name || '') + '</div></div><div class="card"><p style="margin:0">استلمت الإدارة طلبك، وبعد تفعيله تظهر هنا بيانات حسابك ونقاطك ويمكنك الطلب من المتجر.</p></div>'; return; }
+    if (SIGN) { t.innerHTML = '<div class="big ok" style="background:#fff8e6;border-color:#e6cd8f;color:#7a5a00"><div class="l">' + (SIGN.kind === 'reset' ? 'طلب إعادة تعيين كلمة المرور بانتظار الموافقة' : 'حسابك بانتظار التفعيل') + '</div><div class="v" style="font-size:22px">شكراً ' + esc(SIGN.name || '') + '</div></div><div class="card"><p style="margin:0">استلمت الإدارة طلبك وقد تراسلك على واتساب للتأكد. بعد الموافقة تظهر هنا بيانات حسابك ونقاطك ويمكنك الطلب من المتجر.</p></div>'; return; }
     t.innerHTML = '<div class="card"><b>تعذر عرض حسابك</b><p class="mut">إن تغيّرت كلمة مرورك فسجّل الدخول بالكلمة الجديدة، أو تواصل مع الإدارة.</p></div>'; return;
   }
   if (DATA === null) { t.innerHTML = '<div class="card mut">جارٍ التحميل…</div>'; return; }
@@ -350,14 +367,47 @@ async function loadCat(force) {
   if (!force && CAT.length && Date.now() - CATAT < 60000) return;
   try {
     const s = await fsM.getDocs(fsM.collection(fs, 'catalog')); CAT = [];
-    s.forEach(d => { const x = d.data(); if (x.active !== false) CAT.push({ id:d.id, ...x }); });
+    s.forEach(d => { const x = d.data(); if (d.id === '_settings' || x.cfg) { SETT = x; return; } if (x.active !== false) CAT.push({ id:d.id, ...x }); });
     CAT.sort((a, b) => (a.sort || 0) - (b.sort || 0)); CATAT = Date.now();
   } catch (e) { toast(errText(e)); }
 }
+const BILLS = [
+  { k:'elec', n:'فاتورة كهرباء', e:'⚡', l:'رقم العداد أو الاشتراك' },
+  { k:'water', n:'فاتورة مياه', e:'🚰', l:'رقم الحساب أو العداد' },
+  { k:'gas', n:'فاتورة غاز', e:'🔥', l:'رقم العداد أو الاشتراك' },
+  { k:'net', n:'فاتورة إنترنت', e:'🌐', l:'رقم الخط أو الحساب' },
+  { k:'land', n:'فاتورة تليفون أرضي', e:'☎️', l:'رقم التليفون الأرضي' },
+  { k:'mob', n:'فاتورة موبايل', e:'📱', l:'رقم الموبايل' },
+  { k:'org', n:'فاتورة أورنج', e:'🟠', l:'رقم الخط أو الحساب' },
+  { k:'vod', n:'فاتورة فودافون', e:'🔴', l:'رقم الخط أو الحساب' }
+];
+function openBill(k) {
+  const b = BILLS.find(x => x.k === k); if (!b) return;
+  const fee = +((SETT.billFees || {})[k]) || 0;
+  const s = $('sheet'), c = $('sheet-in'); s.classList.remove('hide');
+  c.innerHTML = `<h2 style="margin:0 0 8px;color:var(--navy2)">${b.e} ${esc(b.n)}</h2>
+    <label>${esc(b.l)}</label><input id="b-ref" inputmode="numeric" autocomplete="off" placeholder="اكتب الرقم">
+    <label>قيمة الفاتورة (اختياري)</label><input id="b-amt" inputmode="decimal" placeholder="اتركه فارغاً إن كنت لا تعرفها">
+    ${fee > 0 ? `<div class="linfo" style="background:#fff8e6;border-color:#e6cd8f;color:#7a5a00">رسوم الخدمة: <b style="color:#7a5a00">${money(fee)} ج</b> تُضاف على قيمة الفاتورة.</div>` : ''}
+    <p class="mut">إن تركت القيمة فارغة تستعلم الإدارة عن الفاتورة وتبلغك بقيمتها قبل السداد.</p>
+    <div id="b-err" class="err"></div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="gb" style="flex:1" id="b-add">إضافة للطلب</button><button class="ghost" id="b-close">إغلاق</button></div>`;
+  c.onclick = null;
+  $('b-close').onclick = () => s.classList.add('hide');
+  s.onclick = e => { if (e.target === s) s.classList.add('hide'); };
+  $('b-add').onclick = () => {
+    const ref = $('b-ref').value.trim().slice(0, 40), amt = Math.max(0, +String($('b-amt').value || '0').replace(/[\u0660-\u0669]/g, d => d.charCodeAt(0) - 1632)) || 0;
+    if (ref.length < 3) { $('b-err').textContent = 'اكتب ' + b.l; return; }
+    CART['b:' + k + ':' + ref] = { n:b.n, p:Math.round(amt * 100) / 100, q:1, ref, fee };
+    saveCart(); updateCart(); s.classList.add('hide'); toast('أُضيفت للطلب ✓');
+  };
+}
 async function renderShop(force) {
   const t = $('t-shop');
-  t.innerHTML = '<div class="card"><input id="s-q" placeholder="ابحث عن منتج…" value="' + esc(QTXT) + '"></div><div id="s-list" class="mut" style="text-align:center">جارٍ تحميل المنتجات…</div>';
+  t.innerHTML = '<div class="card"><h2>سداد الفواتير</h2><div class="bgrid">' + BILLS.map(b => `<button class="bb" data-bill="${b.k}"><span class="e">${b.e}</span>${esc(b.n)}</button>`).join('') + '</div></div>' +
+    '<div class="card"><input id="s-q" placeholder="ابحث عن منتج…" value="' + esc(QTXT) + '"></div><div id="s-list" class="mut" style="text-align:center">جارٍ تحميل المنتجات…</div>';
   $('s-q').oninput = e => { QTXT = e.target.value; drawShop(); };
+  t.querySelectorAll('[data-bill]').forEach(b => b.onclick = () => openBill(b.dataset.bill));
   await loadCat(force); drawShop();
 }
 function drawShop() {
@@ -379,7 +429,7 @@ function bump(id, dq) {
   if (q) CART[id] = { n:p.name, p:+p.price, q }; else delete CART[id];
   saveCart(); updateCart();
 }
-function cartTotal() { return Object.values(CART).reduce((s, i) => s + i.p * i.q, 0); }
+function cartTotal() { return Object.values(CART).reduce((s, i) => s + i.p * i.q + (+i.fee || 0), 0); }
 function updateCart() {
   const n = Object.keys(CART).length, bar = $('cartbar');
   bar.classList.toggle('hide', !n || !$('t-shop') || $('t-shop').classList.contains('hide'));
@@ -390,20 +440,23 @@ function openCart() {
   const ids = Object.keys(CART);
   const s = $('sheet'), c = $('sheet-in'); s.classList.remove('hide');
   c.innerHTML = `<h2 style="margin:0 0 8px;color:var(--navy2)">طلبك</h2>` +
-    (ids.length ? ids.map(id => { const i = CART[id]; return `<div class="row"><div style="flex:1"><b>${esc(i.n)}</b><div class="mut">${money(i.p)} ج</div></div>
+    (ids.length ? ids.map(id => { const i = CART[id];
+      return i.ref
+        ? `<div class="row"><div style="flex:1"><b>${esc(i.n)}</b><div class="mut">رقم: <span dir="ltr">${esc(i.ref)}</span></div></div><div style="min-width:90px;text-align:left"><b>${i.p > 0 ? money(i.p) + ' ج' : 'تُحدد عند السداد'}</b>${i.fee > 0 ? `<div class="mut">+ رسوم ${money(i.fee)} ج</div>` : ''}</div><button class="red" style="padding:6px 10px" data-a="d" data-i="${esc(id)}">حذف</button></div>`
+        : `<div class="row"><div style="flex:1"><b>${esc(i.n)}</b><div class="mut">${money(i.p)} ج</div></div>
         <div class="qty" style="min-width:110px"><button data-a="m" data-i="${esc(id)}">−</button><b>${i.q}</b><button data-a="p" data-i="${esc(id)}">+</button></div><b style="min-width:70px;text-align:left">${money(i.p * i.q)}</b></div>`; }).join('') : '<p class="mut">السلة فارغة</p>') +
-    `<div class="row"><b>الإجمالي</b><b style="font-size:20px">${money(cartTotal())} ج</b></div>
+    `<div class="row"><b>الإجمالي</b><b style="font-size:20px">${money(cartTotal())} ج</b></div>${ids.some(i => CART[i].ref && !(CART[i].p > 0)) ? '<p class="mut">قيمة بعض الفواتير غير محددة، تستعلم عنها الإدارة وتبلغك قبل السداد.</p>' : ''}
      <label>ملاحظة للطلب (اختياري)</label><textarea id="o-note" rows="2" placeholder="مثال: التسليم بعد العصر"></textarea>
      <div style="display:flex;gap:8px;margin-top:12px"><button class="gb" style="flex:1" id="o-send" ${ids.length ? '' : 'disabled'}>إرسال الطلب</button><button class="ghost" id="o-close">إغلاق</button></div>
      <p class="mut">يصل طلبك للإدارة فوراً، وسيُضاف على حسابك بعد التجهيز.</p>`;
-  c.onclick = e => { const b = e.target.closest('button[data-a]'); if (!b) return; const id = b.dataset.i; const q = (CART[id] ? CART[id].q : 0) + (b.dataset.a === 'p' ? 1 : -1); if (q <= 0) delete CART[id]; else CART[id].q = q; saveCart(); updateCart(); drawShop(); openCart(); };
+  c.onclick = e => { const b = e.target.closest('button[data-a]'); if (!b) return; const id = b.dataset.i; if (b.dataset.a === 'd') delete CART[id]; else { const q = (CART[id] ? CART[id].q : 0) + (b.dataset.a === 'p' ? 1 : -1); if (q <= 0) delete CART[id]; else CART[id].q = q; } saveCart(); updateCart(); drawShop(); openCart(); };
   $('o-close').onclick = () => s.classList.add('hide');
   s.onclick = e => { if (e.target === s) s.classList.add('hide'); };
   $('o-send').onclick = sendOrder;
 }
 async function sendOrder() {
   const ids = Object.keys(CART); if (!ids.length) return;
-  const items = ids.map(id => ({ n:CART[id].n, q:CART[id].q, p:CART[id].p }));
+  const items = ids.map(id => { const i = CART[id], o = { n:i.n, q:i.q, p:i.p }; if (i.ref) { o.ref = i.ref; if (i.fee > 0) o.fee = i.fee; } return o; });
   const total = Math.round(cartTotal() * 100) / 100, note = ($('o-note').value || '').trim().slice(0, 300);
   const b = $('o-send'); b.disabled = true; b.textContent = 'جارٍ الإرسال…';
   try {
@@ -419,7 +472,7 @@ const STL = { new:'جديد', prep:'قيد التجهيز', done:'تم التس�
 function renderOrd() {
   const t = $('t-ord');
   t.innerHTML = ORD.length ? ORD.map(o => `<div class="card"><div class="row" style="border:0;padding:0 0 6px"><b>${esc(new Date(ms(o)).toLocaleString('ar-EG'))}</b><span class="st ${esc(o.status)}">${STL[o.status] || esc(o.status)}</span></div>
-      ${(o.items || []).map(i => `<div class="row"><span>${esc(i.n)} × ${i.q}</span><b>${money(i.p * i.q)}</b></div>`).join('')}
+      ${(o.items || []).map(i => `<div class="row"><span>${esc(i.n)}${i.ref ? ' — <span dir="ltr">' + esc(i.ref) + '</span>' : (i.q > 1 ? ' × ' + i.q : '')}</span><b>${i.p > 0 ? money(i.p * i.q) : 'تُحدد'}${i.fee > 0 ? ' + ' + money(i.fee) : ''}</b></div>`).join('')}
       <div class="row" style="border:0"><b>الإجمالي</b><b>${money(o.total)} ج</b></div>${o.note ? `<div class="mut">ملاحظتك: ${esc(o.note)}</div>` : ''}</div>`).join('')
     : '<div class="card mut">لا توجد طلبات بعد. اطلب من المتجر 🛍️</div>';
 }
